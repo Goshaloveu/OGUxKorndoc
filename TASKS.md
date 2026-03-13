@@ -183,7 +183,7 @@ curl -X POST http://localhost:8000/api/auth/login \
 
 **Проверка:** POST /api/search с query из текста загруженного документа → score > 0.5
 
-**Статус:** `[ ]`
+**Статус:** `[x]`
 
 ---
 
@@ -370,9 +370,9 @@ curl -X POST http://localhost:8000/api/auth/login \
 ## Прогресс
 
 ```
-Выполнено: 8 / 18
+Выполнено: 9 / 18
 Блок 1 (Инфраструктура):  4/4
-Блок 2 (Backend API):      4/6
+Блок 2 (Backend API):      5/6
 Блок 3 (Frontend):         0/6
 Блок 4 (Интеграция):       0/2
 ```
