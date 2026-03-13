@@ -7,6 +7,7 @@ import '@gravity-ui/uikit/styles/fonts.css';
 import '@gravity-ui/uikit/styles/styles.css';
 import './index.css';
 import App from './App';
+import ToastContainer from './components/ToastContainer';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -23,6 +24,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={queryClient}>
         <ThemeProvider theme="light">
           <App />
+          <ToastContainer />
         </ThemeProvider>
       </QueryClientProvider>
     </BrowserRouter>
