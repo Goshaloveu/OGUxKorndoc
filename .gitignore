@@ -206,3 +206,16 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 URFU-LLM-Agent-main/
+
+# Node / Frontend
+node_modules/
+frontend/dist/
+frontend/build/
+.npm
+
+# Docker volumes data
+postgres_data/
+qdrant_data/
+minio_data/
+redis_data/
+

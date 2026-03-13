@@ -1,0 +1,17 @@
+[project]
+name = "docsearch"
+version = "0.1.0"
+description = "Corporate document repository with semantic search"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.uv.workspace]
+members = ["backend/api", "backend/worker"]
