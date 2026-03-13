@@ -225,7 +225,7 @@ curl -X POST http://localhost:8000/api/auth/login \
 
 **Проверка:** `npm run dev` запускается, http://localhost:5173 показывает страницу логина
 
-**Статус:** `[ ]`
+**Статус:** `[x]`
 
 ---
 
@@ -244,7 +244,7 @@ curl -X POST http://localhost:8000/api/auth/login \
 
 **Проверка:** войти под admin@test.com/admin123 → редирект на / → в header видно имя пользователя
 
-**Статус:** `[ ]`
+**Статус:** `[~]`
 
 ---
 

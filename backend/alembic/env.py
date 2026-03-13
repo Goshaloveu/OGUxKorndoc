@@ -11,9 +11,9 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 # Make sure `shared` package is importable
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import shared.models  # noqa: E402, F401 — registers all ORM models with Base.metadata
 from shared.config import settings  # noqa: E402
 from shared.database import Base  # noqa: E402
-import shared.models  # noqa: E402, F401 — registers all ORM models with Base.metadata
 
 config = context.config
 
