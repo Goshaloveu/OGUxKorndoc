@@ -161,7 +161,7 @@ curl -X POST http://localhost:8000/api/auth/login \
 
 **Проверка:** загрузить документ → `docker-compose logs -f worker` → видно прогресс → через ~30 сек GET /status → "indexed"
 
-**Статус:** `[ ]`
+**Статус:** `[x]`
 
 ---
 
@@ -370,9 +370,9 @@ curl -X POST http://localhost:8000/api/auth/login \
 ## Прогресс
 
 ```
-Выполнено: 7 / 18
+Выполнено: 8 / 18
 Блок 1 (Инфраструктура):  4/4
-Блок 2 (Backend API):      3/6
+Блок 2 (Backend API):      4/6
 Блок 3 (Frontend):         0/6
 Блок 4 (Интеграция):       0/2
 ```
