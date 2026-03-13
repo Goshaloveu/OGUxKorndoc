@@ -58,7 +58,7 @@
 
 **Проверка:** `python3 -c "from shared.models import User, Document, AuditLog; print('OK')"` из backend/
 
-**Статус:** `[ ]`
+**Статус:** `[x]`
 
 ---
 
@@ -370,8 +370,8 @@ curl -X POST http://localhost:8000/api/auth/login \
 ## Прогресс
 
 ```
-Выполнено: 2 / 18
-Блок 1 (Инфраструктура):  2/4
+Выполнено: 3 / 18
+Блок 1 (Инфраструктура):  3/4
 Блок 2 (Backend API):      0/6
 Блок 3 (Frontend):         0/6
 Блок 4 (Интеграция):       0/2
