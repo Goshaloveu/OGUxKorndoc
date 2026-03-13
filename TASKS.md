@@ -115,7 +115,7 @@ curl -X POST http://localhost:8000/api/auth/login \
 # → получить access_token
 ```
 
-**Статус:** `[ ]`
+**Статус:** `[x]`
 
 ---
 
@@ -370,9 +370,9 @@ curl -X POST http://localhost:8000/api/auth/login \
 ## Прогресс
 
 ```
-Выполнено: 5 / 18
+Выполнено: 6 / 18
 Блок 1 (Инфраструктура):  4/4
-Блок 2 (Backend API):      1/6
+Блок 2 (Backend API):      2/6
 Блок 3 (Frontend):         0/6
 Блок 4 (Интеграция):       0/2
 ```
