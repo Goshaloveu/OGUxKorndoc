@@ -1,0 +1,24 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--g-text-body-font-family, system-ui, -apple-system, sans-serif);
+}
+
+mark {
+  background: #fff176;
+  padding: 0 2px;
+  border-radius: 2px;
+  font-style: normal;
+}
