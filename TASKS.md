@@ -204,7 +204,7 @@ curl -X POST http://localhost:8000/api/auth/login \
 
 **Проверка:** GET /api/admin/stats с admin JWT → корректные числа
 
-**Статус:** `[ ]`
+**Статус:** `[x]`
 
 ---
 
@@ -370,9 +370,9 @@ curl -X POST http://localhost:8000/api/auth/login \
 ## Прогресс
 
 ```
-Выполнено: 9 / 18
+Выполнено: 10 / 18
 Блок 1 (Инфраструктура):  4/4
-Блок 2 (Backend API):      5/6
+Блок 2 (Backend API):      6/6
 Блок 3 (Frontend):         0/6
 Блок 4 (Интеграция):       0/2
 ```
