@@ -74,7 +74,7 @@
 
 **Проверка:** `docker-compose up -d postgres && docker-compose run --rm api alembic upgrade head` — без ошибок, таблицы созданы
 
-**Статус:** `[ ]`
+**Статус:** `[x]`
 
 ---
 
@@ -370,8 +370,8 @@ curl -X POST http://localhost:8000/api/auth/login \
 ## Прогресс
 
 ```
-Выполнено: 3 / 18
-Блок 1 (Инфраструктура):  3/4
+Выполнено: 4 / 18
+Блок 1 (Инфраструктура):  4/4
 Блок 2 (Backend API):      0/6
 Блок 3 (Frontend):         0/6
 Блок 4 (Интеграция):       0/2

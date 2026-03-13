@@ -31,9 +31,16 @@ COPY backend/api ./
 # Copy scripts
 COPY backend/scripts ./scripts
 
+# Copy alembic migration files
+COPY backend/alembic.ini ./alembic.ini
+COPY backend/alembic ./alembic
+
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -fsS http://127.0.0.1:8000/health || exit 1
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+COPY backend/api/entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh
+
+CMD ["./entrypoint.sh"]
