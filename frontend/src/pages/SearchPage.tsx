@@ -49,18 +49,18 @@ const SearchPage: React.FC = () => {
       {/* Search bar */}
       <div style={{ display: 'flex', gap: '0.5rem' }}>
         <TextInput
-          size="l"
+          size="xl"
           placeholder="Введите текст или отрывок из документа..."
           value={query}
           onUpdate={setQuery}
           onKeyDown={handleKeyDown}
-          startContent={<Magnifier width={18} height={18} />}
+          startContent={<Magnifier width={20} height={20} />}
           style={{ flex: 1 }}
           disabled={mutation.isPending}
         />
         <Button
           view="action"
-          size="l"
+          size="xl"
           loading={mutation.isPending}
           onClick={handleSearch}
           disabled={!query.trim()}
@@ -69,7 +69,7 @@ const SearchPage: React.FC = () => {
         </Button>
         <Button
           view="outlined"
-          size="l"
+          size="xl"
           onClick={() => setFiltersVisible((v) => !v)}
         >
           Фильтры {filtersVisible ? '▲' : '▼'}

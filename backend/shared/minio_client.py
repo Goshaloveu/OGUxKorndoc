@@ -84,5 +84,5 @@ def generate_presigned_url(object_name: str, expires_in: int = 300) -> str:
     internal_base = f"{scheme}://{settings.minio_endpoint}"
     public_base = settings.minio_public_url.rstrip("/")
     if url.startswith(internal_base):
-        url = public_base + url[len(internal_base):]
+        url = public_base + url[len(internal_base) :]
     return url

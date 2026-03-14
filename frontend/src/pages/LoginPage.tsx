@@ -41,67 +41,101 @@ const LoginPage: React.FC = () => {
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: '100vh',
-        background: 'var(--g-color-base-background)',
+        background: 'linear-gradient(135deg, #1a1f3e 0%, #2d3561 50%, #1e3a5f 100%)',
       }}
     >
-      <Card
-        style={{
-          width: 380,
-          padding: '2rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1.25rem',
-        }}
-      >
-        <Text variant="header-2" style={{ textAlign: 'center' }}>
-          Корпоративный поиск
-        </Text>
-        <Text variant="body-2" color="secondary" style={{ textAlign: 'center' }}>
-          Войдите в систему
-        </Text>
-
-        {errorMessage && (
-          <Alert theme="danger" message={errorMessage} />
-        )}
-
-        <form
-          onSubmit={handleSubmit}
-          style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
-        >
-          <TextInput
-            label="Email"
-            type="email"
-            size="l"
-            value={email}
-            onUpdate={setEmail}
-            placeholder="admin@company.com"
-            autoComplete="email"
-            disabled={mutation.isPending}
-          />
-
-          <TextInput
-            label="Пароль"
-            type="password"
-            size="l"
-            value={password}
-            onUpdate={setPassword}
-            placeholder="••••••••"
-            autoComplete="current-password"
-            disabled={mutation.isPending}
-          />
-
-          <Button
-            type="submit"
-            view="action"
-            size="l"
-            width="max"
-            loading={mutation.isPending}
-            disabled={!email || !password}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem' }}>
+        {/* Logo */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+          <div
+            style={{
+              width: 64,
+              height: 64,
+              background: 'linear-gradient(135deg, #5b67ff 0%, #8b5cf6 100%)',
+              borderRadius: 16,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 32,
+              boxShadow: '0 8px 32px rgba(91, 103, 255, 0.4)',
+            }}
           >
-            Войти
-          </Button>
-        </form>
-      </Card>
+            📋
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <Text
+              variant="header-2"
+              style={{ color: '#ffffff', display: 'block', fontWeight: 700, letterSpacing: -0.5 }}
+            >
+              DocSearch
+            </Text>
+            <Text
+              variant="body-2"
+              style={{ color: 'rgba(255,255,255,0.6)', display: 'block' }}
+            >
+              Корпоративное хранилище документов
+            </Text>
+          </div>
+        </div>
+
+        {/* Login card */}
+        <Card
+          style={{
+            width: 400,
+            padding: '2rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1.25rem',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+          }}
+        >
+          <Text variant="subheader-3" style={{ textAlign: 'center', color: 'var(--g-color-text-secondary)' }}>
+            Войдите в систему
+          </Text>
+
+          {errorMessage && (
+            <Alert theme="danger" message={errorMessage} />
+          )}
+
+          <form
+            onSubmit={handleSubmit}
+            style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
+          >
+            <TextInput
+              label="Email"
+              type="email"
+              size="l"
+              value={email}
+              onUpdate={setEmail}
+              placeholder="admin@company.com"
+              autoComplete="email"
+              disabled={mutation.isPending}
+            />
+
+            <TextInput
+              label="Пароль"
+              type="password"
+              size="l"
+              value={password}
+              onUpdate={setPassword}
+              placeholder="••••••••"
+              autoComplete="current-password"
+              disabled={mutation.isPending}
+            />
+
+            <Button
+              type="submit"
+              view="action"
+              size="xl"
+              width="max"
+              loading={mutation.isPending}
+              disabled={!email || !password}
+            >
+              Войти
+            </Button>
+          </form>
+        </Card>
+      </div>
     </div>
   );
 };

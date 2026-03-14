@@ -196,19 +196,46 @@ const UploadPage: React.FC = () => {
         onDrop={handleDrop}
         onClick={() => fileInputRef.current?.click()}
         style={{
-          border: `2px dashed ${isDragOver ? '#3d96f9' : '#c0c0c0'}`,
-          borderRadius: 12,
-          padding: '2.5rem',
+          border: `2px dashed ${isDragOver ? '#5b67ff' : 'var(--g-color-line-generic-accent)'}`,
+          borderRadius: 16,
+          padding: '3rem 2rem',
           textAlign: 'center',
           cursor: 'pointer',
-          background: isDragOver ? 'rgba(61, 150, 249, 0.06)' : 'transparent',
-          transition: 'all 0.15s',
+          background: isDragOver
+            ? 'rgba(91, 103, 255, 0.06)'
+            : 'var(--g-color-base-simple-hover-solid)',
+          transition: 'all 0.2s',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '0.75rem',
         }}
       >
-        <Text variant="body-2" color="secondary">
-          Перетащите файлы сюда или нажмите для выбора
-        </Text>
-        <br />
+        <div
+          style={{
+            width: 64,
+            height: 64,
+            borderRadius: 16,
+            background: isDragOver
+              ? 'rgba(91, 103, 255, 0.15)'
+              : 'var(--g-color-base-misc-light)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 28,
+            transition: 'all 0.2s',
+          }}
+        >
+          {isDragOver ? '📂' : '⬆️'}
+        </div>
+        <div>
+          <Text variant="body-2" style={{ fontWeight: 600, display: 'block' }}>
+            {isDragOver ? 'Отпустите файлы здесь' : 'Перетащите файлы сюда'}
+          </Text>
+          <Text variant="caption-2" color="secondary" style={{ display: 'block', marginTop: 4 }}>
+            или нажмите для выбора
+          </Text>
+        </div>
         <Text variant="caption-2" color="hint">
           PDF, DOCX, XLSX, TXT · не более 50 МБ
         </Text>
@@ -302,7 +329,7 @@ const UploadPage: React.FC = () => {
           >
             <Text variant="subheader-2">Очередь загрузки ({queue.length})</Text>
             {waitingCount > 0 && (
-              <Button view="action" onClick={uploadAll}>
+              <Button view="action" size="xl" onClick={uploadAll}>
                 Загрузить все ({waitingCount})
               </Button>
             )}

@@ -7,6 +7,15 @@ import './Layout.css';
 interface NavItem {
   to: string;
   label: string;
+  icon: string;
+}
+
+function getInitials(name: string): string {
+  return name
+    .split(/[\s._-]+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('');
 }
 
 const Layout: React.FC = () => {
@@ -23,11 +32,13 @@ const Layout: React.FC = () => {
   }
 
   const navItems: NavItem[] = [
-    { to: '/', label: 'Поиск' },
-    { to: '/upload', label: 'Загрузить' },
-    { to: '/documents', label: 'Документы' },
-    { to: '/profile', label: 'Профиль' },
-    ...(user?.role === 'admin' ? [{ to: '/admin', label: 'Администрирование' }] : []),
+    { to: '/', label: 'Поиск', icon: '🔍' },
+    { to: '/upload', label: 'Загрузить', icon: '⬆️' },
+    { to: '/documents', label: 'Документы', icon: '📄' },
+    { to: '/profile', label: 'Профиль', icon: '👤' },
+    ...(user?.role === 'admin'
+      ? [{ to: '/admin', label: 'Администрирование', icon: '⚙️' }]
+      : []),
   ];
 
   const isActive = (path: string) => {
@@ -35,33 +46,38 @@ const Layout: React.FC = () => {
     return location.pathname.startsWith(path);
   };
 
+  const initials = user ? getInitials(user.username) || user.username.slice(0, 2).toUpperCase() : '?';
+
   return (
     <div className="layout">
       <aside className="layout-sidebar">
         <div className="layout-logo">
-          <Text variant="header-1">DocSearch</Text>
+          <div className="layout-logo-icon">📋</div>
+          <span className="layout-logo-text">DocSearch</span>
         </div>
         <nav className="layout-nav">
           {navItems.map((item) => (
-            <Button
+            <button
               key={item.to}
-              view={isActive(item.to) ? 'outlined' : 'flat'}
-              width="max"
-              size="l"
+              className={`nav-item${isActive(item.to) ? ' active' : ''}`}
               onClick={() => navigate(item.to)}
             >
+              <span className="nav-item-icon">{item.icon}</span>
               {item.label}
-            </Button>
+            </button>
           ))}
         </nav>
       </aside>
       <div className="layout-main">
         <header className="layout-header">
           <div className="layout-header-user">
-            <Text variant="body-2">{user?.username}</Text>
-            <Text variant="caption-2" color="secondary">
-              {user?.role === 'admin' ? 'Администратор' : 'Пользователь'}
-            </Text>
+            <div className="layout-header-info">
+              <Text variant="body-2" style={{ fontWeight: 600 }}>{user?.username}</Text>
+              <Text variant="caption-2" color="secondary">
+                {user?.role === 'admin' ? 'Администратор' : 'Пользователь'}
+              </Text>
+            </div>
+            <div className="layout-avatar">{initials}</div>
           </div>
           <Button view="outlined" size="s" onClick={logout}>
             Выйти

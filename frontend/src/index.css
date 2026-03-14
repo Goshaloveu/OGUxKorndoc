@@ -16,6 +16,17 @@ body {
   font-family: var(--g-text-body-font-family, system-ui, -apple-system, sans-serif);
 }
 
+:root {
+  --g-color-base-brand: #5b67ff;
+  --g-color-base-brand-hover: #4a55e8;
+  --app-sidebar-bg-start: #1a1f3e;
+  --app-sidebar-bg-end: #2d3561;
+  --app-sidebar-text: rgba(255, 255, 255, 0.85);
+  --app-sidebar-text-hover: #ffffff;
+  --app-sidebar-active-bg: rgba(91, 103, 255, 0.35);
+  --app-sidebar-active-border: #5b67ff;
+}
+
 mark {
   background: #fff176;
   padding: 0 2px;

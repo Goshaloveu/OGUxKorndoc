@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button, Label, Text, Modal, Card } from '@gravity-ui/uikit';
+import { Button, Label, Text, Modal } from '@gravity-ui/uikit';
 import { FileText, FileArrowDown } from '@gravity-ui/icons';
 import { getPresignedUrl } from '../api/documents';
 import type { SearchResult } from '../types';
@@ -15,6 +15,20 @@ const FILE_TYPE_LABELS: Record<string, string> = {
   txt: 'TXT',
 };
 
+const FILE_TYPE_COLORS: Record<string, string> = {
+  pdf: '#e53e3e',
+  docx: '#3182ce',
+  xlsx: '#38a169',
+  txt: '#718096',
+};
+
+const FILE_TYPE_BADGE_THEMES: Record<string, 'danger' | 'info' | 'success' | 'normal'> = {
+  pdf: 'danger',
+  docx: 'info',
+  xlsx: 'success',
+  txt: 'normal',
+};
+
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('ru-RU', {
     day: '2-digit',
@@ -28,14 +42,15 @@ const SearchResultCard: React.FC<SearchResultCardProps> = ({ result }) => {
   const [previewText, setPreviewText] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [pdfPresignedUrl, setPdfPresignedUrl] = useState<string | null>(null);
+  const [hovered, setHovered] = useState(false);
 
   const scorePercent = Math.round(result.score * 100);
+  const borderColor = FILE_TYPE_COLORS[result.file_type] ?? '#718096';
 
   const handlePreview = async () => {
     setPreviewOpen(true);
 
     if (result.file_type === 'pdf') {
-      // iframe can't send auth headers — fetch a presigned URL first
       if (pdfPresignedUrl) return;
       setPreviewLoading(true);
       try {
@@ -49,7 +64,7 @@ const SearchResultCard: React.FC<SearchResultCardProps> = ({ result }) => {
       return;
     }
 
-    if (previewText !== null) return; // already loaded
+    if (previewText !== null) return;
     setPreviewLoading(true);
     try {
       const token = localStorage.getItem('access_token');
@@ -79,16 +94,32 @@ const SearchResultCard: React.FC<SearchResultCardProps> = ({ result }) => {
       a.click();
       document.body.removeChild(a);
     } catch {
-      // fallback: do nothing — user sees no visible error for download
+      // fallback: do nothing
     }
   };
 
   return (
     <>
-      <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <div
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          borderRadius: 10,
+          border: '1px solid var(--g-color-line-generic)',
+          borderLeft: `4px solid ${borderColor}`,
+          padding: '1rem 1.25rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.5rem',
+          background: hovered ? 'var(--g-color-base-simple-hover)' : 'var(--g-color-base-background)',
+          transition: 'background 0.15s, box-shadow 0.15s',
+          boxShadow: hovered ? '0 4px 16px rgba(0,0,0,0.08)' : '0 1px 4px rgba(0,0,0,0.04)',
+          cursor: 'default',
+        }}
+      >
         {/* Header row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <FileText width={20} height={20} />
+          <FileText width={20} height={20} style={{ color: borderColor, flexShrink: 0 }} />
           <Text variant="body-2" style={{ fontWeight: 600, flex: 1, minWidth: 0 }}>
             {result.title}
           </Text>
@@ -97,7 +128,7 @@ const SearchResultCard: React.FC<SearchResultCardProps> = ({ result }) => {
           >
             {scorePercent}%
           </Label>
-          <Label theme="info">
+          <Label theme={FILE_TYPE_BADGE_THEMES[result.file_type] ?? 'normal'}>
             {FILE_TYPE_LABELS[result.file_type] ?? result.file_type}
           </Label>
         </div>
@@ -114,23 +145,15 @@ const SearchResultCard: React.FC<SearchResultCardProps> = ({ result }) => {
 
         {/* Action buttons */}
         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-          <Button
-            view="outlined"
-            size="s"
-            onClick={handlePreview}
-          >
+          <Button view="outlined" size="s" onClick={handlePreview}>
             Превью
           </Button>
-          <Button
-            view="outlined"
-            size="s"
-            onClick={handleDownload}
-          >
+          <Button view="outlined" size="s" onClick={handleDownload}>
             <FileArrowDown width={14} height={14} />
             Скачать
           </Button>
         </div>
-      </Card>
+      </div>
 
       {/* Preview modal */}
       <Modal open={previewOpen} onClose={() => setPreviewOpen(false)}>
