@@ -40,11 +40,23 @@ export interface AuditLogResponse {
   limit: number;
 }
 
+export interface ServiceHealth {
+  status: string;
+  error: string | null;
+}
+
 export interface SystemHealth {
-  postgres: string;
-  qdrant: string;
-  redis: string;
-  minio: string;
+  postgres: ServiceHealth;
+  qdrant: ServiceHealth;
+  redis: ServiceHealth;
+  minio: ServiceHealth;
+}
+
+export interface AdminUserListResponse {
+  items: AdminUser[];
+  total: number;
+  page: number;
+  limit: number;
 }
 
 export interface CreateUserParams {
@@ -60,8 +72,8 @@ export interface UpdateUserParams {
 }
 
 export async function getAdminUsers(): Promise<AdminUser[]> {
-  const response = await api.get<AdminUser[]>('/admin/users');
-  return response.data;
+  const response = await api.get<AdminUserListResponse>('/admin/users');
+  return response.data.items;
 }
 
 export async function createAdminUser(params: CreateUserParams): Promise<AdminUser> {

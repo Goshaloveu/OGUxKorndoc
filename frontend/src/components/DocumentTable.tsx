@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Button,
   Label,
   Modal,
   Pagination,
+  Skeleton,
   Text,
   TextInput,
 } from '@gravity-ui/uikit';
@@ -20,7 +21,7 @@ interface DocumentTableProps {
   page: number;
   pageSize: number;
   isAdmin: boolean;
-  searchQuery: string;
+  isLoading?: boolean;
   sortKey: 'title' | 'uploaded_at' | 'file_size';
   sortDir: 'asc' | 'desc';
   onPageChange: (page: number) => void;
@@ -71,7 +72,7 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
   page,
   pageSize,
   isAdmin,
-  searchQuery,
+  isLoading = false,
   sortKey,
   sortDir,
   onPageChange,
@@ -80,6 +81,23 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
 }) => {
   const queryClient = useQueryClient();
   const [deleteTarget, setDeleteTarget] = useState<Document | null>(null);
+  // Local input state — does not lose focus on parent re-render
+  const [inputValue, setInputValue] = useState('');
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleInputChange = (value: string) => {
+    setInputValue(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      onSearchChange(value);
+    }, 400);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => deleteDocument(id),
@@ -134,8 +152,8 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
       {/* Search */}
       <TextInput
         placeholder="Поиск по названию..."
-        value={searchQuery}
-        onUpdate={onSearchChange}
+        value={inputValue}
+        onUpdate={handleInputChange}
         style={{ maxWidth: 400 }}
       />
 
@@ -178,7 +196,15 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
             </tr>
           </thead>
           <tbody>
-            {items.length === 0 ? (
+            {isLoading ? (
+              Array.from({ length: 6 }).map((_, i) => (
+                <tr key={i}>
+                  <td colSpan={isAdmin ? 8 : 7} style={{ padding: '4px 12px' }}>
+                    <Skeleton style={{ height: 32 }} />
+                  </td>
+                </tr>
+              ))
+            ) : items.length === 0 ? (
               <tr>
                 <td
                   colSpan={isAdmin ? 8 : 7}

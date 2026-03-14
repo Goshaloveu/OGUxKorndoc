@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Skeleton, Alert, Text, Select } from '@gravity-ui/uikit';
+import { Alert, Text, Select } from '@gravity-ui/uikit';
 import { getDocuments } from '../api/documents';
 import { useAuth } from '../hooks/useAuth';
 import DocumentTable from '../components/DocumentTable';
@@ -31,33 +31,19 @@ const DocumentsPage: React.FC = () => {
   const isAdmin = user?.role === 'admin';
 
   const [page, setPage] = useState(1);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [searchFilter, setSearchFilter] = useState('');
   const [fileTypeFilter, setFileTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('uploaded_at');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
-  // Debounce search input
-  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(() => {
-      setDebouncedSearch(searchQuery);
-      setPage(1);
-    }, 300);
-    return () => {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    };
-  }, [searchQuery]);
-
-  // Reset page when filters change
-  useEffect(() => {
+  const handleSearchChange = (value: string) => {
+    setSearchFilter(value);
     setPage(1);
-  }, [fileTypeFilter, statusFilter, sortKey, sortDir]);
+  };
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['documents', page, debouncedSearch, fileTypeFilter, statusFilter, sortKey, sortDir],
+    queryKey: ['documents', page, fileTypeFilter, statusFilter],
     queryFn: () =>
       getDocuments({
         page,
@@ -82,8 +68,8 @@ const DocumentsPage: React.FC = () => {
     let items = [...data.items];
 
     // Filter by search query
-    if (debouncedSearch.trim()) {
-      const q = debouncedSearch.toLowerCase();
+    if (searchFilter.trim()) {
+      const q = searchFilter.toLowerCase();
       items = items.filter(
         (doc) =>
           doc.title.toLowerCase().includes(q) || doc.filename.toLowerCase().includes(q),
@@ -104,7 +90,7 @@ const DocumentsPage: React.FC = () => {
     });
 
     return items;
-  }, [data, debouncedSearch, sortKey, sortDir]);
+  }, [data, searchFilter, sortKey, sortDir]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -137,34 +123,23 @@ const DocumentsPage: React.FC = () => {
         )}
       </div>
 
-      {/* Content */}
-      {isLoading && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} style={{ height: 42 }} />
-          ))}
-        </div>
-      )}
-
       {isError && (
         <Alert theme="danger" title="Ошибка загрузки" message="Не удалось загрузить список документов" />
       )}
 
-      {!isLoading && !isError && (
-        <DocumentTable
-          items={filteredAndSorted}
-          total={data?.total ?? 0}
-          page={page}
-          pageSize={PAGE_SIZE}
-          isAdmin={isAdmin}
-          searchQuery={searchQuery}
-          sortKey={sortKey}
-          sortDir={sortDir}
-          onPageChange={setPage}
-          onSearchChange={setSearchQuery}
-          onSort={handleSort}
-        />
-      )}
+      <DocumentTable
+        items={filteredAndSorted}
+        total={data?.total ?? 0}
+        page={page}
+        pageSize={PAGE_SIZE}
+        isAdmin={isAdmin}
+        isLoading={isLoading}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onPageChange={setPage}
+        onSearchChange={handleSearchChange}
+        onSort={handleSort}
+      />
     </div>
   );
 };

@@ -2,15 +2,15 @@ import React from 'react';
 import { Text, Skeleton } from '@gravity-ui/uikit';
 import { useQuery } from '@tanstack/react-query';
 import { getSystemHealth } from '../../api/admin';
-import type { SystemHealth } from '../../api/admin';
+import type { SystemHealth, ServiceHealth } from '../../api/admin';
 
 interface ServiceCardProps {
   name: string;
-  status: string;
+  health: ServiceHealth;
 }
 
-const ServiceCard: React.FC<ServiceCardProps> = ({ name, status }) => {
-  const isOk = status === 'ok';
+const ServiceCard: React.FC<ServiceCardProps> = ({ name, health }) => {
+  const isOk = health.status === 'ok';
   return (
     <div
       style={{
@@ -40,7 +40,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ name, status }) => {
           variant="body-1"
           style={{ color: isOk ? '#27ae60' : '#e74c3c', fontWeight: 600 }}
         >
-          {isOk ? 'Работает' : status}
+          {isOk ? 'Работает' : (health.error ?? health.status)}
         </Text>
       </div>
     </div>
@@ -79,7 +79,7 @@ const HealthTab: React.FC = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
         {(Object.keys(SERVICE_NAMES) as Array<keyof SystemHealth>).map((key) => (
-          <ServiceCard key={key} name={SERVICE_NAMES[key]} status={data[key]} />
+          <ServiceCard key={key} name={SERVICE_NAMES[key]} health={data[key]} />
         ))}
       </div>
       <Text variant="caption-2" color="secondary">
