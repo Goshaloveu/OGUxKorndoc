@@ -89,7 +89,46 @@ def _extract_text_docx(file_data: bytes) -> tuple[str, int]:
     import docx
 
     document = docx.Document(io.BytesIO(file_data))
-    text = "\n".join(p.text for p in document.paragraphs)
+
+    parts: list[str] = []
+
+    # Extract text from paragraphs
+    for p in document.paragraphs:
+        if p.text.strip():
+            parts.append(p.text)
+
+    # Extract text from tables
+    for table in document.tables:
+        for row in table.rows:
+            row_texts = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+            if row_texts:
+                parts.append("\t".join(row_texts))
+
+    text = "\n".join(parts)
+    logger.info(
+        "DOCX extraction: %d paragraphs, %d tables, %d chars total",
+        len(document.paragraphs),
+        len(document.tables),
+        len(text),
+    )
+
+    # Fallback: if still empty, try raw XML extraction via zipfile
+    if not text.strip():
+        logger.warning("python-docx gave empty text, falling back to raw XML extraction")
+        import re
+        import zipfile
+
+        try:
+            with zipfile.ZipFile(io.BytesIO(file_data)) as zf:
+                if "word/document.xml" in zf.namelist():
+                    xml_content = zf.read("word/document.xml").decode("utf-8", errors="replace")
+                    # Extract text between <w:t> tags
+                    raw_texts = re.findall(r"<w:t[^>]*>(.*?)</w:t>", xml_content, re.DOTALL)
+                    text = " ".join(raw_texts)
+                    logger.info("XML fallback extracted %d chars", len(text))
+        except Exception as xml_err:
+            logger.warning("XML fallback also failed: %s", xml_err)
+
     return text, 0
 
 

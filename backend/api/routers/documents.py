@@ -176,7 +176,7 @@ async def upload_document(
 async def list_documents(
     page: int = 1,
     limit: int = 20,
-    doc_status: str | None = None,
+    status: str | None = None,
     file_type: str | None = None,
     folder_path: str | None = None,
     org_id: int | None = None,
@@ -216,8 +216,8 @@ async def list_documents(
 
         query = query.where(or_(*conditions))
 
-    if doc_status:
-        query = query.where(Document.status == doc_status)
+    if status:
+        query = query.where(Document.status == status)
     if file_type:
         query = query.where(Document.file_type == file_type)
     if folder_path:
