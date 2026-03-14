@@ -4,6 +4,7 @@ import UsersTab from '../components/admin/UsersTab';
 import StatsTab from '../components/admin/StatsTab';
 import AuditLogTab from '../components/admin/AuditLogTab';
 import HealthTab from '../components/admin/HealthTab';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 type TabId = 'users' | 'stats' | 'audit' | 'health';
 
@@ -58,10 +59,26 @@ const AdminPage: React.FC = () => {
 
       {/* Tab content */}
       <div>
-        {activeTab === 'users' && <UsersTab />}
-        {activeTab === 'stats' && <StatsTab />}
-        {activeTab === 'audit' && <AuditLogTab />}
-        {activeTab === 'health' && <HealthTab />}
+        {activeTab === 'users' && (
+          <ErrorBoundary fallbackTitle="Ошибка вкладки «Пользователи»">
+            <UsersTab />
+          </ErrorBoundary>
+        )}
+        {activeTab === 'stats' && (
+          <ErrorBoundary fallbackTitle="Ошибка вкладки «Статистика»">
+            <StatsTab />
+          </ErrorBoundary>
+        )}
+        {activeTab === 'audit' && (
+          <ErrorBoundary fallbackTitle="Ошибка вкладки «Журнал действий»">
+            <AuditLogTab />
+          </ErrorBoundary>
+        )}
+        {activeTab === 'health' && (
+          <ErrorBoundary fallbackTitle="Ошибка вкладки «Здоровье системы»">
+            <HealthTab />
+          </ErrorBoundary>
+        )}
       </div>
     </div>
   );
