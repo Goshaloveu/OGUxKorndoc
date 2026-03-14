@@ -1,12 +1,17 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Alert, Text, Select } from '@gravity-ui/uikit';
+import { Alert, Button, Pagination, Text, Select } from '@gravity-ui/uikit';
+import { ListUl, LayoutCellsLarge, LayoutCells } from '@gravity-ui/icons';
 import { getDocuments } from '../api/documents';
 import { useAuth } from '../hooks/useAuth';
 import DocumentTable from '../components/DocumentTable';
+import DocumentGrid from '../components/DocumentGrid';
 
 type SortKey = 'title' | 'uploaded_at' | 'file_size';
 type SortDir = 'asc' | 'desc';
+type ViewMode = 'list' | 'grid-large' | 'grid-small';
+
+const VIEW_MODE_KEY = 'docs-view-mode';
 
 const FILE_TYPE_OPTIONS = [
   { value: '', content: 'Все типы' },
@@ -26,6 +31,12 @@ const STATUS_OPTIONS = [
 
 const PAGE_SIZE = 20;
 
+function loadViewMode(): ViewMode {
+  const saved = localStorage.getItem(VIEW_MODE_KEY);
+  if (saved === 'list' || saved === 'grid-large' || saved === 'grid-small') return saved;
+  return 'list';
+}
+
 const DocumentsPage: React.FC = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
@@ -36,6 +47,12 @@ const DocumentsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('uploaded_at');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [viewMode, setViewMode] = useState<ViewMode>(loadViewMode);
+
+  const handleViewMode = (mode: ViewMode) => {
+    setViewMode(mode);
+    localStorage.setItem(VIEW_MODE_KEY, mode);
+  };
 
   const handleSearchChange = (value: string) => {
     setSearchFilter(value);
@@ -62,12 +79,11 @@ const DocumentsPage: React.FC = () => {
     }
   };
 
-  // Client-side sort + filter (since API may not support all params)
+  // Client-side sort + filter
   const filteredAndSorted = React.useMemo(() => {
     if (!data) return [];
     let items = [...data.items];
 
-    // Filter by search query
     if (searchFilter.trim()) {
       const q = searchFilter.toLowerCase();
       items = items.filter(
@@ -76,7 +92,6 @@ const DocumentsPage: React.FC = () => {
       );
     }
 
-    // Sort
     items.sort((a, b) => {
       let cmp = 0;
       if (sortKey === 'title') {
@@ -96,7 +111,7 @@ const DocumentsPage: React.FC = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <Text variant="header-1">Документы</Text>
 
-      {/* Filters row */}
+      {/* Filters + view switcher row */}
       <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ minWidth: 160 }}>
           <Select
@@ -116,30 +131,80 @@ const DocumentsPage: React.FC = () => {
             width="max"
           />
         </div>
+
         {data && (
-          <Text variant="caption-2" color="secondary" style={{ marginLeft: 'auto' }}>
+          <Text variant="caption-2" color="secondary">
             Всего: {data.total}
           </Text>
         )}
+
+        {/* View mode switcher */}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.25rem' }}>
+          <Button
+            view={viewMode === 'list' ? 'action' : 'outlined'}
+            size="m"
+            title="Список"
+            onClick={() => handleViewMode('list')}
+          >
+            <ListUl width={16} height={16} />
+          </Button>
+          <Button
+            view={viewMode === 'grid-large' ? 'action' : 'outlined'}
+            size="m"
+            title="Плитка крупная"
+            onClick={() => handleViewMode('grid-large')}
+          >
+            <LayoutCellsLarge width={16} height={16} />
+          </Button>
+          <Button
+            view={viewMode === 'grid-small' ? 'action' : 'outlined'}
+            size="m"
+            title="Плитка мелкая"
+            onClick={() => handleViewMode('grid-small')}
+          >
+            <LayoutCells width={16} height={16} />
+          </Button>
+        </div>
       </div>
 
       {isError && (
         <Alert theme="danger" title="Ошибка загрузки" message="Не удалось загрузить список документов" />
       )}
 
-      <DocumentTable
-        items={filteredAndSorted}
-        total={data?.total ?? 0}
-        page={page}
-        pageSize={PAGE_SIZE}
-        isAdmin={isAdmin}
-        isLoading={isLoading}
-        sortKey={sortKey}
-        sortDir={sortDir}
-        onPageChange={setPage}
-        onSearchChange={handleSearchChange}
-        onSort={handleSort}
-      />
+      {viewMode === 'list' ? (
+        <DocumentTable
+          items={filteredAndSorted}
+          total={data?.total ?? 0}
+          page={page}
+          pageSize={PAGE_SIZE}
+          isAdmin={isAdmin}
+          isLoading={isLoading}
+          sortKey={sortKey}
+          sortDir={sortDir}
+          onPageChange={setPage}
+          onSearchChange={handleSearchChange}
+          onSort={handleSort}
+        />
+      ) : (
+        <>
+          <DocumentGrid
+            items={filteredAndSorted}
+            isAdmin={isAdmin}
+            isLoading={isLoading}
+            size={viewMode === 'grid-large' ? 'large' : 'small'}
+          />
+          {data && data.total > PAGE_SIZE && (
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <Pagination
+                page={page}
+                pageSize={PAGE_SIZE}
+                total={data.total}
+                onUpdate={(newPage) => setPage(newPage)}
+              />
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };
