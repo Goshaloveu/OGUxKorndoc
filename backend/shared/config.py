@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     minio_secret_key: str = "minioadmin123"
     minio_bucket: str = "documents"
     minio_secure: bool = False
+    # Public URL for presigned downloads (browser-accessible). In Docker, minio:9000
+    # is not accessible from browser, so we rewrite to this address.
+    minio_public_url: str = "http://localhost:9000"
 
     # Qdrant
     qdrant_host: str = "qdrant"

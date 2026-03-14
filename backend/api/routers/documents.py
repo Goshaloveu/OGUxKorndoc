@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict
 from shared.database import get_db
-from shared.minio_client import download_file, upload_file
+from shared.minio_client import download_file, generate_presigned_url, upload_file
 from shared.models import AuditLog, Document, DocumentPermission, OrganizationMember, User
 from shared.security import get_current_user
 from sqlalchemy import func, or_, select
@@ -74,6 +74,11 @@ class DocumentListOut(BaseModel):
 class DocumentPreviewOut(BaseModel):
     text: str
     page_count: int | None
+
+
+class PresignedUrlOut(BaseModel):
+    url: str
+    expires_in: int
 
 
 # ---------------------------------------------------------------------------
@@ -319,6 +324,30 @@ async def get_document_preview(
         raise HTTPException(status_code=500, detail="Ошибка извлечения текста") from exc
 
     return DocumentPreviewOut(text=text[:3000], page_count=doc.page_count)
+
+
+@router.get("/{document_id}/presigned-url", response_model=PresignedUrlOut)
+async def get_presigned_url(
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return a short-lived presigned URL for direct browser download/preview (viewer+).
+
+    The URL is valid for 5 minutes and bypasses the API auth header requirement,
+    making it usable in iframes and <a href> links.
+    """
+    doc = await check_document_access(document_id, "viewer", current_user, db)
+
+    try:
+        url = await asyncio.get_running_loop().run_in_executor(
+            None, generate_presigned_url, doc.minio_path, 300
+        )
+    except Exception as exc:
+        logger.error("Failed to generate presigned URL for doc %d: %s", document_id, exc)
+        raise HTTPException(status_code=500, detail="Ошибка генерации URL") from exc
+
+    return PresignedUrlOut(url=url, expires_in=300)
 
 
 # ---------------------------------------------------------------------------

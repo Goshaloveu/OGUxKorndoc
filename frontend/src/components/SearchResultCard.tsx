@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Button, Label, Text, Modal, Card } from '@gravity-ui/uikit';
 import { FileText, FileArrowDown } from '@gravity-ui/icons';
+import { getPresignedUrl } from '../api/documents';
 import type { SearchResult } from '../types';
 
 interface SearchResultCardProps {
@@ -26,13 +27,27 @@ const SearchResultCard: React.FC<SearchResultCardProps> = ({ result }) => {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewText, setPreviewText] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [pdfPresignedUrl, setPdfPresignedUrl] = useState<string | null>(null);
 
-  const downloadUrl = `/api/documents/${result.document_id}/download`;
   const scorePercent = Math.round(result.score * 100);
 
   const handlePreview = async () => {
     setPreviewOpen(true);
-    if (result.file_type === 'pdf') return; // iframe handles it
+
+    if (result.file_type === 'pdf') {
+      // iframe can't send auth headers — fetch a presigned URL first
+      if (pdfPresignedUrl) return;
+      setPreviewLoading(true);
+      try {
+        const url = await getPresignedUrl(result.document_id);
+        setPdfPresignedUrl(url);
+      } catch {
+        setPdfPresignedUrl(null);
+      } finally {
+        setPreviewLoading(false);
+      }
+      return;
+    }
 
     if (previewText !== null) return; // already loaded
     setPreviewLoading(true);
@@ -51,6 +66,20 @@ const SearchResultCard: React.FC<SearchResultCardProps> = ({ result }) => {
       setPreviewText('Ошибка загрузки превью');
     } finally {
       setPreviewLoading(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    try {
+      const url = await getPresignedUrl(result.document_id);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = result.title;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch {
+      // fallback: do nothing — user sees no visible error for download
     }
   };
 
@@ -95,8 +124,7 @@ const SearchResultCard: React.FC<SearchResultCardProps> = ({ result }) => {
           <Button
             view="outlined"
             size="s"
-            href={downloadUrl}
-            target="_blank"
+            onClick={handleDownload}
           >
             <FileArrowDown width={14} height={14} />
             Скачать
@@ -110,11 +138,17 @@ const SearchResultCard: React.FC<SearchResultCardProps> = ({ result }) => {
           <Text variant="header-1">{result.title}</Text>
           <div style={{ flex: 1, overflow: 'hidden' }}>
             {result.file_type === 'pdf' ? (
-              <iframe
-                src={downloadUrl}
-                title={result.title}
-                style={{ width: '100%', height: '100%', border: 'none' }}
-              />
+              previewLoading ? (
+                <Text color="secondary">Загрузка PDF...</Text>
+              ) : pdfPresignedUrl ? (
+                <iframe
+                  src={pdfPresignedUrl}
+                  title={result.title}
+                  style={{ width: '100%', height: '100%', border: 'none' }}
+                />
+              ) : (
+                <Text color="secondary">Не удалось загрузить PDF</Text>
+              )
             ) : previewLoading ? (
               <Text color="secondary">Загрузка...</Text>
             ) : (

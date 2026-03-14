@@ -67,3 +67,22 @@ def delete_file(object_name: str) -> None:
     client = get_minio_client()
     client.delete_object(Bucket=settings.minio_bucket, Key=object_name)
     logger.info("Deleted %s from MinIO bucket %s", object_name, settings.minio_bucket)
+
+
+def generate_presigned_url(object_name: str, expires_in: int = 300) -> str:
+    """Generate a presigned GET URL for the object, rewriting the internal hostname
+    to the public-facing URL so browsers can access it directly."""
+    client = get_minio_client()
+    url: str = client.generate_presigned_url(
+        "get_object",
+        Params={"Bucket": settings.minio_bucket, "Key": object_name},
+        ExpiresIn=expires_in,
+    )
+    # The generated URL contains the internal hostname (e.g. http://minio:9000).
+    # Replace it with the configured public URL so browsers can reach MinIO.
+    scheme = "https" if settings.minio_secure else "http"
+    internal_base = f"{scheme}://{settings.minio_endpoint}"
+    public_base = settings.minio_public_url.rstrip("/")
+    if url.startswith(internal_base):
+        url = public_base + url[len(internal_base):]
+    return url

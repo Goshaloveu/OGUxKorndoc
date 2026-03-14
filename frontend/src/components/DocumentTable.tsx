@@ -10,7 +10,7 @@ import {
 import { FileText, TrashBin, ArrowsRotateRight } from '@gravity-ui/icons';
 import { toaster } from '@gravity-ui/uikit/toaster-singleton';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { deleteDocument } from '../api/documents';
+import { deleteDocument, getPresignedUrl } from '../api/documents';
 import { reindexDocument } from '../api/admin';
 import type { Document } from '../types';
 
@@ -207,9 +207,21 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
                   </td>
                   <td style={{ padding: '8px 12px', maxWidth: 260 }}>
                     <a
-                      href={`/api/documents/${doc.id}/download`}
-                      target="_blank"
-                      rel="noreferrer"
+                      href="#"
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        try {
+                          const url = await getPresignedUrl(doc.id);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = doc.filename;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                        } catch {
+                          // ignore
+                        }
+                      }}
                       style={{
                         color: '#3d96f9',
                         textDecoration: 'none',
@@ -217,6 +229,7 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
                         display: 'block',
+                        cursor: 'pointer',
                       }}
                       title={doc.title}
                     >

@@ -65,3 +65,10 @@ export async function getDocuments(params?: {
 export async function deleteDocument(id: number): Promise<void> {
   await api.delete(`/documents/${id}`);
 }
+
+export async function getPresignedUrl(id: number): Promise<string> {
+  const response = await api.get<{ url: string; expires_in: number }>(
+    `/documents/${id}/presigned-url`,
+  );
+  return response.data.url;
+}

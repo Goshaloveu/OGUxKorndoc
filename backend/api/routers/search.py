@@ -224,13 +224,14 @@ async def search(
     search_limit = query.limit * 3
 
     try:
-        hits = qdrant.search(
+        response = qdrant.query_points(
             collection_name=settings.qdrant_collection,
-            query_vector=vector,
+            query=vector,
             query_filter=qdrant_filter,
             limit=search_limit,
             with_payload=True,
         )
+        hits = response.points
     except Exception as exc:
         logger.warning("Qdrant search failed (collection may be empty): %s", exc)
         hits = []
