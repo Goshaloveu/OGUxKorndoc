@@ -8,7 +8,7 @@
 .layout-sidebar {
   width: 240px;
   min-width: 240px;
-  background: linear-gradient(180deg, var(--app-sidebar-bg-start) 0%, var(--app-sidebar-bg-end) 100%);
+  background: #1a1a1a;
   display: flex;
   flex-direction: column;
   padding: 16px 0;
@@ -24,7 +24,7 @@
 .layout-logo-icon {
   width: 32px;
   height: 32px;
-  background: #5b67ff;
+  background: var(--g-color-base-brand);
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -55,7 +55,7 @@
   padding: 10px 12px;
   border-radius: 8px;
   cursor: pointer;
-  color: var(--app-sidebar-text);
+  color: rgba(255, 255, 255, 0.7);
   font-size: 14px;
   font-weight: 500;
   transition: background 0.15s, color 0.15s;
@@ -67,14 +67,14 @@
 }
 
 .nav-item:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--app-sidebar-text-hover);
+  background: rgba(203, 255, 92, 0.12);
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .nav-item.active {
-  background: var(--app-sidebar-active-bg);
-  color: #ffffff;
-  border-left: 3px solid var(--app-sidebar-active-border);
+  background: rgba(203, 255, 92, 0.18);
+  color: var(--g-color-base-brand);
+  border-left: 3px solid var(--g-color-base-brand);
   padding-left: 9px;
 }
 
@@ -119,11 +119,11 @@
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #5b67ff 0%, #8b5cf6 100%);
+  background: var(--g-color-base-brand);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
+  color: #1a1a1a;
   font-size: 13px;
   font-weight: 700;
   flex-shrink: 0;

@@ -41,7 +41,7 @@ const LoginPage: React.FC = () => {
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #1a1f3e 0%, #2d3561 50%, #1e3a5f 100%)',
+        background: 'linear-gradient(135deg, #1a1a1a 0%, #2a3020 50%, #1a2a10 100%)',
       }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem' }}>
@@ -51,23 +51,22 @@ const LoginPage: React.FC = () => {
             style={{
               width: 64,
               height: 64,
-              background: 'linear-gradient(135deg, #5b67ff 0%, #8b5cf6 100%)',
+              background: 'var(--g-color-base-brand)',
               borderRadius: 16,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: 32,
-              boxShadow: '0 8px 32px rgba(91, 103, 255, 0.4)',
+              boxShadow: '0 8px 32px rgba(203, 255, 92, 0.3)',
             }}
           >
-            📋
           </div>
           <div style={{ textAlign: 'center' }}>
             <Text
               variant="header-2"
               style={{ color: '#ffffff', display: 'block', fontWeight: 700, letterSpacing: -0.5 }}
             >
-              DocSearch
+              КорнДок
             </Text>
             <Text
               variant="body-2"
@@ -86,7 +85,7 @@ const LoginPage: React.FC = () => {
             display: 'flex',
             flexDirection: 'column',
             gap: '1.25rem',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.4)',
           }}
         >
           <Text variant="subheader-3" style={{ textAlign: 'center', color: 'var(--g-color-text-secondary)' }}>
