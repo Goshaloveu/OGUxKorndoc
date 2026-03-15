@@ -1,19 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Button,
+  Dialog,
+  Icon,
   Label,
-  Modal,
   Pagination,
   Skeleton,
+  Table,
   Text,
   TextInput,
 } from '@gravity-ui/uikit';
-import { FileText, TrashBin, ArrowsRotateRight } from '@gravity-ui/icons';
+import { FileText, TrashBin, ArrowsRotateRight, ArrowUpFromSquare } from '@gravity-ui/icons';
 import { toaster } from '@gravity-ui/uikit/toaster-singleton';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { deleteDocument, getPresignedUrl } from '../api/documents';
+import { deleteDocument } from '../api/documents';
 import { reindexDocument } from '../api/admin';
 import type { Document } from '../types';
+import DocumentPreviewModal from './DocumentPreviewModal';
+import DocumentShareModal from './DocumentShareModal';
 
 interface DocumentTableProps {
   items: Document[];
@@ -21,6 +25,7 @@ interface DocumentTableProps {
   page: number;
   pageSize: number;
   isAdmin: boolean;
+  currentUserId?: number;
   isLoading?: boolean;
   sortKey: 'title' | 'uploaded_at' | 'file_size';
   sortDir: 'asc' | 'desc';
@@ -72,6 +77,7 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
   page,
   pageSize,
   isAdmin,
+  currentUserId,
   isLoading = false,
   sortKey,
   sortDir,
@@ -81,7 +87,8 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
 }) => {
   const queryClient = useQueryClient();
   const [deleteTarget, setDeleteTarget] = useState<Document | null>(null);
-  // Local input state — does not lose focus on parent re-render
+  const [previewDoc, setPreviewDoc] = useState<Document | null>(null);
+  const [shareDoc, setShareDoc] = useState<Document | null>(null);
   const [inputValue, setInputValue] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -143,9 +150,145 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
   });
 
   const sortArrow = (key: SortKey) => {
-    if (sortKey !== key) return null;
+    if (sortKey !== key) return '';
     return sortDir === 'asc' ? ' ▲' : ' ▼';
   };
+
+  const columns = [
+    {
+      id: 'type_icon',
+      name: '',
+      template: () => <Icon data={FileText} size={18} />,
+    },
+    {
+      id: 'title',
+      name: `Название${sortArrow('title')}`,
+      template: (doc: Document) => (
+        <div style={{ maxWidth: 260 }}>
+          <a
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              setPreviewDoc(doc);
+            }}
+            style={{
+              color: 'var(--g-color-text-link)',
+              textDecoration: 'none',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              display: 'block',
+              cursor: 'pointer',
+            }}
+            title={doc.title}
+          >
+            {doc.title}
+          </a>
+          {doc.filename !== doc.title && (
+            <Text variant="caption-2" color="hint">
+              {doc.filename}
+            </Text>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: 'file_type',
+      name: 'Формат',
+      template: (doc: Document) => (
+        <Label theme={FILE_TYPE_THEMES[doc.file_type] ?? 'normal'} size="s">
+          {doc.file_type.toUpperCase()}
+        </Label>
+      ),
+    },
+    {
+      id: 'file_size',
+      name: `Размер${sortArrow('file_size')}`,
+      template: (doc: Document) => (
+        <Text variant="body-1">{formatSize(doc.file_size)}</Text>
+      ),
+    },
+    {
+      id: 'status',
+      name: 'Статус',
+      template: (doc: Document) => (
+        <Label theme={STATUS_THEMES[doc.status]} size="s">
+          {STATUS_LABELS[doc.status]}
+        </Label>
+      ),
+    },
+    {
+      id: 'uploaded_at',
+      name: `Дата${sortArrow('uploaded_at')}`,
+      template: (doc: Document) => (
+        <Text variant="body-1">{formatDate(doc.uploaded_at)}</Text>
+      ),
+    },
+    {
+      id: 'folder_path',
+      name: 'Папка',
+      template: (doc: Document) => (
+        <Text
+          variant="caption-2"
+          color="secondary"
+          style={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            display: 'block',
+            maxWidth: 160,
+          }}
+          title={doc.folder_path}
+        >
+          {doc.folder_path}
+        </Text>
+      ),
+    },
+    {
+      id: 'share',
+      name: '',
+      template: (doc: Document) =>
+        isAdmin || doc.uploaded_by === currentUserId ? (
+          <Button
+            view="flat"
+            size="s"
+            onClick={() => setShareDoc(doc)}
+            title="Поделиться"
+          >
+            <Icon data={ArrowUpFromSquare} size={14} />
+          </Button>
+        ) : null,
+    },
+    ...(isAdmin
+      ? [
+          {
+            id: 'actions',
+            name: 'Действия',
+            template: (doc: Document) => (
+              <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                <Button
+                  view="outlined"
+                  size="s"
+                  loading={reindexMutation.isPending && reindexMutation.variables === doc.id}
+                  onClick={() => reindexMutation.mutate(doc.id)}
+                  title="Переиндексировать"
+                >
+                  <Icon data={ArrowsRotateRight} size={14} />
+                </Button>
+                <Button
+                  view="outlined-danger"
+                  size="s"
+                  onClick={() => setDeleteTarget(doc)}
+                  title="Удалить"
+                >
+                  <Icon data={TrashBin} size={14} />
+                </Button>
+              </div>
+            ),
+          },
+        ]
+      : []),
+  ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -158,174 +301,39 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
       />
 
       {/* Table */}
-      <div style={{ overflowX: 'auto' }}>
-        <table
-          style={{
-            width: '100%',
-            borderCollapse: 'collapse',
-            fontSize: 14,
+      {isLoading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} style={{ height: 40, width: '100%' }} />
+          ))}
+        </div>
+      ) : (
+        <Table
+          data={items}
+          columns={columns}
+          getRowId={(row) => String(row.id)}
+          emptyMessage="Документов не найдено"
+          onRowClick={(row) => {
+            // clicking row header cells (sortable) is handled via column name click
+            void row;
           }}
-        >
-          <thead>
-            <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-              <th style={{ padding: '8px 12px', textAlign: 'left', width: 36 }}>Тип</th>
-              <th
-                style={{ padding: '8px 12px', textAlign: 'left', cursor: 'pointer', userSelect: 'none' }}
-                onClick={() => onSort('title')}
-              >
-                Название{sortArrow('title')}
-              </th>
-              <th style={{ padding: '8px 12px', textAlign: 'left' }}>Формат</th>
-              <th
-                style={{ padding: '8px 12px', textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
-                onClick={() => onSort('file_size')}
-              >
-                Размер{sortArrow('file_size')}
-              </th>
-              <th style={{ padding: '8px 12px', textAlign: 'left' }}>Статус</th>
-              <th
-                style={{ padding: '8px 12px', textAlign: 'left', cursor: 'pointer', userSelect: 'none' }}
-                onClick={() => onSort('uploaded_at')}
-              >
-                Дата{sortArrow('uploaded_at')}
-              </th>
-              <th style={{ padding: '8px 12px', textAlign: 'left' }}>Папка</th>
-              {isAdmin && (
-                <th style={{ padding: '8px 12px', textAlign: 'center' }}>Действия</th>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              Array.from({ length: 6 }).map((_, i) => (
-                <tr key={i}>
-                  <td colSpan={isAdmin ? 8 : 7} style={{ padding: '4px 12px' }}>
-                    <Skeleton style={{ height: 32 }} />
-                  </td>
-                </tr>
-              ))
-            ) : items.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={isAdmin ? 8 : 7}
-                  style={{ padding: '2rem', textAlign: 'center', color: '#888' }}
-                >
-                  Документов не найдено
-                </td>
-              </tr>
-            ) : (
-              items.map((doc) => (
-                <tr
-                  key={doc.id}
-                  style={{
-                    borderBottom: '1px solid #f0f0f0',
-                    transition: 'background 0.1s',
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLTableRowElement).style.background = '#fafafa';
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLTableRowElement).style.background = 'transparent';
-                  }}
-                >
-                  <td style={{ padding: '8px 12px' }}>
-                    <FileText width={18} height={18} />
-                  </td>
-                  <td style={{ padding: '8px 12px', maxWidth: 260 }}>
-                    <a
-                      href="#"
-                      onClick={async (e) => {
-                        e.preventDefault();
-                        try {
-                          const url = await getPresignedUrl(doc.id);
-                          const a = document.createElement('a');
-                          a.href = url;
-                          a.download = doc.filename;
-                          document.body.appendChild(a);
-                          a.click();
-                          document.body.removeChild(a);
-                        } catch {
-                          // ignore
-                        }
-                      }}
-                      style={{
-                        color: '#3d96f9',
-                        textDecoration: 'none',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        display: 'block',
-                        cursor: 'pointer',
-                      }}
-                      title={doc.title}
-                    >
-                      {doc.title}
-                    </a>
-                    {doc.filename !== doc.title && (
-                      <Text variant="caption-2" color="hint">
-                        {doc.filename}
-                      </Text>
-                    )}
-                  </td>
-                  <td style={{ padding: '8px 12px' }}>
-                    <Label theme={FILE_TYPE_THEMES[doc.file_type] ?? 'normal'} size="s">
-                      {doc.file_type.toUpperCase()}
-                    </Label>
-                  </td>
-                  <td style={{ padding: '8px 12px', textAlign: 'right' }}>
-                    <Text variant="body-1">{formatSize(doc.file_size)}</Text>
-                  </td>
-                  <td style={{ padding: '8px 12px' }}>
-                    <Label theme={STATUS_THEMES[doc.status]} size="s">
-                      {STATUS_LABELS[doc.status]}
-                    </Label>
-                  </td>
-                  <td style={{ padding: '8px 12px' }}>
-                    <Text variant="body-1">{formatDate(doc.uploaded_at)}</Text>
-                  </td>
-                  <td style={{ padding: '8px 12px', maxWidth: 160 }}>
-                    <Text
-                      variant="caption-2"
-                      color="secondary"
-                      style={{
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        display: 'block',
-                      }}
-                      title={doc.folder_path}
-                    >
-                      {doc.folder_path}
-                    </Text>
-                  </td>
-                  {isAdmin && (
-                    <td style={{ padding: '8px 12px' }}>
-                      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
-                        <Button
-                          view="outlined"
-                          size="s"
-                          loading={reindexMutation.isPending && reindexMutation.variables === doc.id}
-                          onClick={() => reindexMutation.mutate(doc.id)}
-                          title="Переиндексировать"
-                        >
-                          <ArrowsRotateRight width={14} height={14} />
-                        </Button>
-                        <Button
-                          view="outlined-danger"
-                          size="s"
-                          onClick={() => setDeleteTarget(doc)}
-                          title="Удалить"
-                        >
-                          <TrashBin width={14} height={14} />
-                        </Button>
-                      </div>
-                    </td>
-                  )}
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+        />
+      )}
+
+      {/* Sort controls */}
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+        <Text variant="caption-2" color="secondary">Сортировка:</Text>
+        {(['title', 'uploaded_at', 'file_size'] as SortKey[]).map((key) => (
+          <Button
+            key={key}
+            view={sortKey === key ? 'action' : 'flat'}
+            size="s"
+            onClick={() => onSort(key)}
+          >
+            {key === 'title' ? 'Название' : key === 'uploaded_at' ? 'Дата' : 'Размер'}
+            {sortKey === key ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
+          </Button>
+        ))}
       </div>
 
       {/* Pagination */}
@@ -340,38 +348,35 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
         </div>
       )}
 
-      {/* Delete confirmation modal */}
-      <Modal open={deleteTarget !== null} onClose={() => setDeleteTarget(null)}>
-        <div
-          style={{
-            padding: '1.5rem',
-            minWidth: 320,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '1rem',
-          }}
-        >
-          <Text variant="header-2">Удалить документ?</Text>
+      {/* Delete confirmation dialog */}
+      <Dialog open={deleteTarget !== null} onClose={() => setDeleteTarget(null)} size="s">
+        <Dialog.Header caption="Удалить документ?" />
+        <Dialog.Body>
           <Text variant="body-1">
             Вы уверены что хотите удалить &laquo;{deleteTarget?.title}&raquo;? Это действие
             необратимо.
           </Text>
-          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-            <Button view="normal" onClick={() => setDeleteTarget(null)}>
-              Отмена
-            </Button>
-            <Button
-              view="outlined-danger"
-              loading={deleteMutation.isPending}
-              onClick={() => {
-                if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
-              }}
-            >
-              Удалить
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        </Dialog.Body>
+        <Dialog.Footer
+          onClickButtonApply={() => {
+            if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
+          }}
+          onClickButtonCancel={() => setDeleteTarget(null)}
+          textButtonApply="Удалить"
+          textButtonCancel="Отмена"
+          loading={deleteMutation.isPending}
+        />
+      </Dialog>
+
+      {/* Preview modal */}
+      <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />
+
+      {/* Share modal */}
+      <DocumentShareModal
+        docId={shareDoc?.id ?? null}
+        docTitle={shareDoc?.title ?? ''}
+        onClose={() => setShareDoc(null)}
+      />
     </div>
   );
 };

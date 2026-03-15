@@ -30,6 +30,16 @@ export interface Document {
   department: string | null;
 }
 
+export interface DocumentPermission {
+  id: number;
+  document_id: number;
+  user_id: number | null;
+  org_id: number | null;
+  level: 'viewer' | 'editor' | 'owner';
+  granted_by: number;
+  granted_at: string;
+}
+
 // Search
 export interface SearchFilters {
   file_type?: string;

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Button, Card, Label, Modal, Skeleton, Text } from '@gravity-ui/uikit';
+import { Button, Card, Dialog, Label, Skeleton, Text } from '@gravity-ui/uikit';
 import { FileText, TrashBin, ArrowsRotateRight } from '@gravity-ui/icons';
 import { toaster } from '@gravity-ui/uikit/toaster-singleton';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { deleteDocument, getPresignedUrl } from '../api/documents';
+import { deleteDocument } from '../api/documents';
 import { reindexDocument } from '../api/admin';
 import type { Document } from '../types';
+import DocumentPreviewModal from './DocumentPreviewModal';
 
 interface DocumentGridProps {
   items: Document[];
@@ -58,6 +59,7 @@ const DocumentGrid: React.FC<DocumentGridProps> = ({
 }) => {
   const queryClient = useQueryClient();
   const [deleteTarget, setDeleteTarget] = useState<Document | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<Document | null>(null);
 
   const cardWidth = size === 'large' ? 200 : 140;
   const cardHeight = size === 'large' ? 240 : 160;
@@ -143,7 +145,7 @@ const DocumentGrid: React.FC<DocumentGridProps> = ({
                 left: 0,
                 right: 0,
                 height: 4,
-                background: FILE_TYPE_COLORS[doc.file_type] ?? '#999',
+                background: FILE_TYPE_COLORS[doc.file_type] ?? 'var(--g-color-base-generic-hover)',
                 borderRadius: '12px 12px 0 0',
               }}
             />
@@ -154,11 +156,13 @@ const DocumentGrid: React.FC<DocumentGridProps> = ({
                 width: iconSize,
                 height: iconSize,
                 borderRadius: 10,
-                background: `${FILE_TYPE_COLORS[doc.file_type] ?? '#999'}18`,
+                background: FILE_TYPE_COLORS[doc.file_type]
+                  ? `${FILE_TYPE_COLORS[doc.file_type]}18`
+                  : 'var(--g-color-base-generic)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: FILE_TYPE_COLORS[doc.file_type] ?? '#999',
+                color: FILE_TYPE_COLORS[doc.file_type] ?? 'var(--g-color-text-secondary)',
                 marginTop: size === 'large' ? 4 : 2,
               }}
             >
@@ -185,19 +189,7 @@ const DocumentGrid: React.FC<DocumentGridProps> = ({
                   cursor: 'pointer',
                   color: 'var(--g-color-text-link)',
                 }}
-                onClick={async () => {
-                  try {
-                    const url = await getPresignedUrl(doc.id);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = doc.filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                  } catch {
-                    // ignore
-                  }
-                }}
+                onClick={() => setPreviewDoc(doc)}
                 title={doc.title}
               >
                 {doc.title}
@@ -249,38 +241,28 @@ const DocumentGrid: React.FC<DocumentGridProps> = ({
         ))}
       </div>
 
-      {/* Delete confirmation modal */}
-      <Modal open={deleteTarget !== null} onClose={() => setDeleteTarget(null)}>
-        <div
-          style={{
-            padding: '1.5rem',
-            minWidth: 320,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '1rem',
-          }}
-        >
-          <Text variant="header-2">Удалить документ?</Text>
+      {/* Preview modal */}
+      <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={deleteTarget !== null} onClose={() => setDeleteTarget(null)} size="s">
+        <Dialog.Header caption="Удалить документ?" />
+        <Dialog.Body>
           <Text variant="body-1">
             Вы уверены что хотите удалить &laquo;{deleteTarget?.title}&raquo;? Это действие
             необратимо.
           </Text>
-          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-            <Button view="normal" onClick={() => setDeleteTarget(null)}>
-              Отмена
-            </Button>
-            <Button
-              view="outlined-danger"
-              loading={deleteMutation.isPending}
-              onClick={() => {
-                if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
-              }}
-            >
-              Удалить
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        </Dialog.Body>
+        <Dialog.Footer
+          onClickButtonApply={() => {
+            if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
+          }}
+          onClickButtonCancel={() => setDeleteTarget(null)}
+          textButtonApply="Удалить"
+          textButtonCancel="Отмена"
+          propsButtonApply={{ view: 'outlined-danger', loading: deleteMutation.isPending }}
+        />
+      </Dialog>
     </>
   );
 };

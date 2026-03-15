@@ -1,5 +1,5 @@
 import api from './client';
-import type { Document } from '../types';
+import type { Document, DocumentPermission } from '../types';
 
 export interface DocumentStatus {
   id: number;
@@ -71,4 +71,37 @@ export async function getPresignedUrl(id: number): Promise<string> {
     `/documents/${id}/presigned-url`,
   );
   return response.data.url;
+}
+
+export interface DocumentPreview {
+  text: string;
+  page_count: number;
+}
+
+export async function getDocumentPreview(id: number): Promise<DocumentPreview> {
+  const response = await api.get<DocumentPreview>(`/documents/${id}/preview`);
+  return response.data;
+}
+
+export interface AddPermissionParams {
+  user_id?: number;
+  org_id?: number;
+  level: 'viewer' | 'editor' | 'owner';
+}
+
+export async function getDocumentPermissions(id: number): Promise<DocumentPermission[]> {
+  const response = await api.get<DocumentPermission[]>(`/documents/${id}/permissions`);
+  return response.data;
+}
+
+export async function addDocumentPermission(
+  id: number,
+  params: AddPermissionParams,
+): Promise<DocumentPermission> {
+  const response = await api.post<DocumentPermission>(`/documents/${id}/permissions`, params);
+  return response.data;
+}
+
+export async function removeDocumentPermission(id: number, permId: number): Promise<void> {
+  await api.delete(`/documents/${id}/permissions/${permId}`);
 }
