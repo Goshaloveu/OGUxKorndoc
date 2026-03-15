@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button, Label, Modal, Skeleton, Text } from '@gravity-ui/uikit';
+import { Button, Card, Label, Modal, Skeleton, Text } from '@gravity-ui/uikit';
 import { FileText, TrashBin, ArrowsRotateRight } from '@gravity-ui/icons';
 import { toaster } from '@gravity-ui/uikit/toaster-singleton';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -104,7 +104,7 @@ const DocumentGrid: React.FC<DocumentGridProps> = ({
 
   if (items.length === 0) {
     return (
-      <div style={{ padding: '3rem', textAlign: 'center', color: '#888' }}>
+      <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--g-color-text-hint)' }}>
         Документов не найдено
       </div>
     );
@@ -120,32 +120,19 @@ const DocumentGrid: React.FC<DocumentGridProps> = ({
         }}
       >
         {items.map((doc) => (
-          <div
+          <Card
             key={doc.id}
+            type="action"
             style={{
               width: '100%',
               minHeight: cardHeight,
-              background: '#fff',
-              borderRadius: 12,
-              boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
-              border: '1px solid #e8e8e8',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               padding: size === 'large' ? '1.25rem 1rem 1rem' : '1rem 0.75rem 0.75rem',
               gap: size === 'large' ? '0.5rem' : '0.35rem',
-              transition: 'box-shadow 0.15s, transform 0.15s',
-              cursor: 'default',
               position: 'relative',
               overflow: 'hidden',
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.14)';
-              (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.08)';
-              (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)';
             }}
           >
             {/* Top color stripe by file type */}
@@ -196,7 +183,7 @@ const DocumentGrid: React.FC<DocumentGridProps> = ({
                   wordBreak: 'break-word',
                   lineHeight: '1.3',
                   cursor: 'pointer',
-                  color: '#3d96f9',
+                  color: 'var(--g-color-text-link)',
                 }}
                 onClick={async () => {
                   try {
@@ -258,7 +245,7 @@ const DocumentGrid: React.FC<DocumentGridProps> = ({
                 )}
               </>
             )}
-          </div>
+          </Card>
         ))}
       </div>
 
