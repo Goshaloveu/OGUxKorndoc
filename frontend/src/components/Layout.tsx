@@ -1,13 +1,15 @@
 import React from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Button, Text } from '@gravity-ui/uikit';
+import { Button, Icon, Text } from '@gravity-ui/uikit';
+import { Magnifier, ArrowUpFromLine, Folder, Person, Gear } from '@gravity-ui/icons';
+import type { IconData } from '@gravity-ui/uikit';
 import { useAuth } from '../hooks/useAuth';
 import './Layout.css';
 
 interface NavItem {
   to: string;
   label: string;
-  icon: string;
+  icon: IconData;
 }
 
 function getInitials(name: string): string {
@@ -32,12 +34,12 @@ const Layout: React.FC = () => {
   }
 
   const navItems: NavItem[] = [
-    { to: '/', label: 'Поиск', icon: '🔍' },
-    { to: '/upload', label: 'Загрузить', icon: '⬆️' },
-    { to: '/documents', label: 'Документы', icon: '📄' },
-    { to: '/profile', label: 'Профиль', icon: '👤' },
+    { to: '/', label: 'Поиск', icon: Magnifier },
+    { to: '/upload', label: 'Загрузить', icon: ArrowUpFromLine },
+    { to: '/documents', label: 'Документы', icon: Folder },
+    { to: '/profile', label: 'Профиль', icon: Person },
     ...(user?.role === 'admin'
-      ? [{ to: '/admin', label: 'Администрирование', icon: '⚙️' }]
+      ? [{ to: '/admin', label: 'Администрирование', icon: Gear }]
       : []),
   ];
 
@@ -52,8 +54,8 @@ const Layout: React.FC = () => {
     <div className="layout">
       <aside className="layout-sidebar">
         <div className="layout-logo">
-          <div className="layout-logo-icon">📋</div>
-          <span className="layout-logo-text">DocSearch</span>
+          <div className="layout-logo-icon"></div>
+          <span className="layout-logo-text">КорнДок</span>
         </div>
         <nav className="layout-nav">
           {navItems.map((item) => (
@@ -62,7 +64,9 @@ const Layout: React.FC = () => {
               className={`nav-item${isActive(item.to) ? ' active' : ''}`}
               onClick={() => navigate(item.to)}
             >
-              <span className="nav-item-icon">{item.icon}</span>
+              <span className="nav-item-icon">
+                <Icon data={item.icon} size={18} />
+              </span>
               {item.label}
             </button>
           ))}
