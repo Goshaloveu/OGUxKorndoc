@@ -3,6 +3,7 @@ import {
   Alert,
   Button,
   Card,
+  Dialog,
   Label,
   Skeleton,
   Table,
@@ -17,7 +18,9 @@ import {
   getProfile,
   updateProfile,
 } from '../api/profile';
+import { getMyOrganizations, createOrganization } from '../api/organizations';
 import type { Document } from '../types';
+import type { Organization } from '../api/organizations';
 
 const STATUS_LABELS: Record<string, { text: string; theme: 'info' | 'success' | 'warning' | 'danger' | 'normal' }> = {
   pending: { text: 'В очереди', theme: 'warning' },
@@ -50,6 +53,8 @@ const ProfilePage: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [docPage, setDocPage] = useState(1);
+  const [isCreateOrgOpen, setIsCreateOrgOpen] = useState(false);
+  const [newOrgName, setNewOrgName] = useState('');
 
   const { data: profile, isLoading, isError } = useQuery({
     queryKey: ['profile'],
@@ -59,6 +64,11 @@ const ProfilePage: React.FC = () => {
   const { data: docsData, isLoading: docsLoading } = useQuery({
     queryKey: ['profile-documents', docPage],
     queryFn: () => getMyDocuments(docPage, 10),
+  });
+
+  const { data: orgs, isLoading: orgsLoading } = useQuery({
+    queryKey: ['my-organizations'],
+    queryFn: getMyOrganizations,
   });
 
   const updateMutation = useMutation({
@@ -74,6 +84,24 @@ const ProfilePage: React.FC = () => {
         name: 'profile-error',
         title: err.response?.data?.detail ?? 'Ошибка обновления',
         theme: 'danger',
+      });
+    },
+  });
+
+  const createOrgMutation = useMutation({
+    mutationFn: () => createOrganization({ name: newOrgName.trim() }),
+    onSuccess: () => {
+      toaster.add({ name: 'org-created', title: 'Организация создана', theme: 'success', autoHiding: 3000 });
+      setNewOrgName('');
+      setIsCreateOrgOpen(false);
+      void queryClient.invalidateQueries({ queryKey: ['my-organizations'] });
+    },
+    onError: (err: { response?: { data?: { detail?: string } } }) => {
+      toaster.add({
+        name: 'org-err',
+        title: err.response?.data?.detail ?? 'Ошибка при создании организации',
+        theme: 'danger',
+        autoHiding: 4000,
       });
     },
   });
@@ -132,6 +160,17 @@ const ProfilePage: React.FC = () => {
   }
 
   const { user, my_documents_count, recent_searches } = profile;
+
+  const orgColumns = [
+    { id: 'id', name: 'ID', width: 60 },
+    { id: 'name', name: 'Название' },
+    { id: 'slug', name: 'Slug' },
+    {
+      id: 'created_at',
+      name: 'Создана',
+      template: (org: Organization) => formatDate(org.created_at),
+    },
+  ];
 
   const docColumns = [
     {
@@ -340,6 +379,54 @@ const ProfilePage: React.FC = () => {
           <Text color="secondary">Вы ещё не загружали документы</Text>
         )}
       </Card>
+
+      {/* Organizations */}
+      <Card style={{ padding: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <Text variant="subheader-2">
+            Мои организации ({orgs?.length ?? 0})
+          </Text>
+          <Button view="action" onClick={() => setIsCreateOrgOpen(true)}>
+            + Создать
+          </Button>
+        </div>
+
+        {orgsLoading ? (
+          <Skeleton style={{ height: 80 }} />
+        ) : orgs && orgs.length > 0 ? (
+          <Table
+            data={orgs}
+            columns={orgColumns}
+            getRowId={(org) => String(org.id)}
+            emptyMessage="Организаций нет"
+          />
+        ) : (
+          <Text color="secondary">Вы не состоите ни в одной организации</Text>
+        )}
+      </Card>
+
+      {/* Create organization dialog */}
+      <Dialog open={isCreateOrgOpen} onClose={() => setIsCreateOrgOpen(false)} size="s">
+        <Dialog.Header caption="Создать организацию" />
+        <Dialog.Body>
+          <TextInput
+            label="Название"
+            value={newOrgName}
+            onUpdate={setNewOrgName}
+            placeholder="Название организации"
+            size="l"
+          />
+        </Dialog.Body>
+        <Dialog.Footer
+          onClickButtonApply={() => {
+            if (newOrgName.trim()) createOrgMutation.mutate();
+          }}
+          onClickButtonCancel={() => setIsCreateOrgOpen(false)}
+          textButtonApply="Создать"
+          textButtonCancel="Отмена"
+          propsButtonApply={{ loading: createOrgMutation.isPending, disabled: !newOrgName.trim() }}
+        />
+      </Dialog>
     </div>
   );
 };
