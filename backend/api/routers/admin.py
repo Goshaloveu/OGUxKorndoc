@@ -22,7 +22,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
 from shared.config import settings
 from shared.database import get_db
-from shared.models import AuditLog, Document, User
+from shared.models import AuditLog, Document, Organization, User
 from shared.security import hash_password
 from sqlalchemy import func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -312,6 +312,25 @@ async def reindex_document(
         logger.warning("Failed to queue reindex task for doc %d: %s", document_id, exc)
 
     return {"detail": "Документ поставлен в очередь на переиндексацию", "document_id": document_id}
+
+
+class AdminOrgOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    name: str
+    slug: str
+    created_by: int
+    created_at: datetime
+
+
+@router.get("/organizations", response_model=list[AdminOrgOut])
+async def list_organizations(
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all organizations (admin only)."""
+    result = await db.execute(select(Organization).order_by(Organization.name))
+    return [AdminOrgOut.model_validate(org) for org in result.scalars().all()]
 
 
 @router.get("/system/health", response_model=HealthOut)

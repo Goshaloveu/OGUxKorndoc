@@ -8,8 +8,10 @@ import {
   Table,
   Text,
   TextInput,
+  withTableActions,
 } from '@gravity-ui/uikit';
-import { Plus, Person, TrashBin } from '@gravity-ui/icons';
+import type { TableActionConfig } from '@gravity-ui/uikit';
+import { Plus, Person } from '@gravity-ui/icons';
 import { toaster } from '@gravity-ui/uikit/toaster-singleton';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -37,6 +39,8 @@ function formatDate(iso: string): string {
     year: 'numeric',
   });
 }
+
+const EnhancedTable = withTableActions(Table<AdminUser>);
 
 const UsersTab: React.FC = () => {
   const queryClient = useQueryClient();
@@ -148,38 +152,28 @@ const UsersTab: React.FC = () => {
         </Text>
       ),
     },
-    {
-      id: 'actions',
-      name: 'Действия',
-      template: (u: AdminUser) => (
-        <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
-          <Button
-            view="outlined"
-            size="s"
-            onClick={() =>
-              updateMutation.mutate({
-                id: u.id,
-                params: { role: u.role === 'admin' ? 'user' : 'admin' },
-              })
-            }
-            title={u.role === 'admin' ? 'Снять права admin' : 'Назначить admin'}
-          >
-            {u.role === 'admin' ? 'user' : 'admin'}
-          </Button>
-          {u.is_active && (
-            <Button
-              view="outlined-danger"
-              size="s"
-              onClick={() => setDeactivateTarget(u)}
-              title="Деактивировать"
-            >
-              <Icon data={TrashBin} size={14} />
-            </Button>
-          )}
-        </div>
-      ),
-    },
   ];
+
+  const getRowActions = (user: AdminUser): TableActionConfig<AdminUser>[] => {
+    const actions: TableActionConfig<AdminUser>[] = [
+      {
+        text: user.role === 'admin' ? 'Сделать пользователем' : 'Назначить администратором',
+        handler: () =>
+          updateMutation.mutate({
+            id: user.id,
+            params: { role: user.role === 'admin' ? 'user' : 'admin' },
+          }),
+      },
+    ];
+    if (user.is_active) {
+      actions.push({
+        text: 'Деактивировать',
+        handler: () => setDeactivateTarget(user),
+        theme: 'danger',
+      });
+    }
+    return actions;
+  };
 
   if (isLoading) {
     return <Text color="secondary">Загрузка...</Text>;
@@ -197,11 +191,13 @@ const UsersTab: React.FC = () => {
         </Button>
       </div>
 
-      <Table
+      <EnhancedTable
         data={users ?? []}
         columns={columns}
         getRowId={(u) => String(u.id)}
         emptyMessage="Пользователей не найдено"
+        getRowActions={getRowActions}
+        rowActionsSize="m"
       />
 
       {/* Create user modal */}

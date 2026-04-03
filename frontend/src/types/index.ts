@@ -3,6 +3,9 @@ export interface User {
   email: string;
   username: string;
   role: 'admin' | 'user';
+  is_active?: boolean;
+  created_at?: string;
+  last_login?: string | null;
 }
 
 export interface ApiError {

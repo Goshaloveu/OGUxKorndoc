@@ -62,6 +62,18 @@ export async function getDocuments(params?: {
   return response.data;
 }
 
+export interface UpdateDocumentParams {
+  title?: string;
+  tags?: string[];
+  folder_path?: string;
+  department?: string;
+}
+
+export async function updateDocument(id: number, params: UpdateDocumentParams): Promise<Document> {
+  const response = await api.patch<Document>(`/documents/${id}`, params);
+  return response.data;
+}
+
 export async function deleteDocument(id: number): Promise<void> {
   await api.delete(`/documents/${id}`);
 }

@@ -4,12 +4,18 @@ import {
   Button,
   Card,
   Dialog,
+  Icon,
   Label,
+  NumberInput,
+  Select,
   Skeleton,
   Table,
   Text,
   TextInput,
+  withTableActions,
 } from '@gravity-ui/uikit';
+import type { TableActionConfig } from '@gravity-ui/uikit';
+import { Person, Persons, Plus } from '@gravity-ui/icons';
 import { toaster } from '@gravity-ui/uikit/toaster-singleton';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -18,9 +24,15 @@ import {
   getProfile,
   updateProfile,
 } from '../api/profile';
-import { getMyOrganizations, createOrganization } from '../api/organizations';
+import {
+  getMyOrganizations,
+  createOrganization,
+  getOrganization,
+  addOrgMember,
+  removeOrgMember,
+} from '../api/organizations';
 import type { Document } from '../types';
-import type { Organization } from '../api/organizations';
+import type { Organization, OrganizationDetail, OrganizationMember } from '../api/organizations';
 
 const STATUS_LABELS: Record<string, { text: string; theme: 'info' | 'success' | 'warning' | 'danger' | 'normal' }> = {
   pending: { text: 'В очереди', theme: 'warning' },
@@ -43,6 +55,9 @@ function formatDate(iso: string): string {
   });
 }
 
+const EnhancedOrgTable = withTableActions(Table<Organization>);
+const EnhancedMemberTable = withTableActions(Table<OrganizationMember>);
+
 const ProfilePage: React.FC = () => {
   const queryClient = useQueryClient();
 
@@ -55,6 +70,9 @@ const ProfilePage: React.FC = () => {
   const [docPage, setDocPage] = useState(1);
   const [isCreateOrgOpen, setIsCreateOrgOpen] = useState(false);
   const [newOrgName, setNewOrgName] = useState('');
+  const [selectedOrgId, setSelectedOrgId] = useState<number | null>(null);
+  const [addMemberUserId, setAddMemberUserId] = useState<number | null>(null);
+  const [addMemberRole, setAddMemberRole] = useState<string[]>(['member']);
 
   const { data: profile, isLoading, isError } = useQuery({
     queryKey: ['profile'],
@@ -103,6 +121,39 @@ const ProfilePage: React.FC = () => {
         theme: 'danger',
         autoHiding: 4000,
       });
+    },
+  });
+
+  const { data: orgDetail, isLoading: orgDetailLoading } = useQuery<OrganizationDetail>({
+    queryKey: ['org-detail', selectedOrgId],
+    queryFn: () => getOrganization(selectedOrgId!),
+    enabled: !!selectedOrgId,
+  });
+
+  const addMemberMutation = useMutation({
+    mutationFn: () =>
+      addOrgMember(selectedOrgId!, {
+        user_id: addMemberUserId!,
+        role: addMemberRole[0] as 'owner' | 'member',
+      }),
+    onSuccess: () => {
+      toaster.add({ name: 'member-added', title: 'Участник добавлен', theme: 'success', autoHiding: 3000 });
+      setAddMemberUserId(null);
+      void queryClient.invalidateQueries({ queryKey: ['org-detail', selectedOrgId] });
+    },
+    onError: (err: { response?: { data?: { detail?: string } } }) => {
+      toaster.add({ name: 'member-err', title: err.response?.data?.detail ?? 'Ошибка', theme: 'danger', autoHiding: 4000 });
+    },
+  });
+
+  const removeMemberMutation = useMutation({
+    mutationFn: (userId: number) => removeOrgMember(selectedOrgId!, userId),
+    onSuccess: () => {
+      toaster.add({ name: 'member-removed', title: 'Участник удалён', theme: 'success', autoHiding: 3000 });
+      void queryClient.invalidateQueries({ queryKey: ['org-detail', selectedOrgId] });
+    },
+    onError: (err: { response?: { data?: { detail?: string } } }) => {
+      toaster.add({ name: 'member-rm-err', title: err.response?.data?.detail ?? 'Ошибка', theme: 'danger', autoHiding: 4000 });
     },
   });
 
@@ -169,6 +220,14 @@ const ProfilePage: React.FC = () => {
       id: 'created_at',
       name: 'Создана',
       template: (org: Organization) => formatDate(org.created_at),
+    },
+  ];
+
+  const getOrgRowActions = (org: Organization): TableActionConfig<Organization>[] => [
+    {
+      text: 'Участники',
+      handler: () => setSelectedOrgId(org.id),
+      icon: <Icon data={Persons} size={14} />,
     },
   ];
 
@@ -394,11 +453,13 @@ const ProfilePage: React.FC = () => {
         {orgsLoading ? (
           <Skeleton style={{ height: 80 }} />
         ) : orgs && orgs.length > 0 ? (
-          <Table
+          <EnhancedOrgTable
             data={orgs}
             columns={orgColumns}
             getRowId={(org) => String(org.id)}
             emptyMessage="Организаций нет"
+            getRowActions={getOrgRowActions}
+            rowActionsSize="m"
           />
         ) : (
           <Text color="secondary">Вы не состоите ни в одной организации</Text>
@@ -425,6 +486,97 @@ const ProfilePage: React.FC = () => {
           textButtonApply="Создать"
           textButtonCancel="Отмена"
           propsButtonApply={{ loading: createOrgMutation.isPending, disabled: !newOrgName.trim() }}
+        />
+      </Dialog>
+
+      {/* Organization detail dialog */}
+      <Dialog open={selectedOrgId !== null} onClose={() => setSelectedOrgId(null)} size="l">
+        <Dialog.Header caption={`Организация: ${orgDetail?.name ?? ''}`} />
+        <Dialog.Body>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: 460 }}>
+            {orgDetailLoading ? (
+              <Skeleton style={{ height: 150 }} />
+            ) : orgDetail ? (
+              <>
+                <Text variant="subheader-2">Участники ({orgDetail.members.length})</Text>
+                <EnhancedMemberTable
+                  data={orgDetail.members}
+                  columns={[
+                    {
+                      id: 'username',
+                      name: 'Пользователь',
+                      template: (m: OrganizationMember) => (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <Icon data={Person} size={14} />
+                          <Text variant="body-1">{m.username}</Text>
+                        </div>
+                      ),
+                    },
+                    { id: 'email', name: 'Email', template: (m: OrganizationMember) => m.email },
+                    {
+                      id: 'role',
+                      name: 'Роль',
+                      template: (m: OrganizationMember) => (
+                        <Label theme={m.role === 'owner' ? 'danger' : 'info'} size="s">
+                          {m.role === 'owner' ? 'Владелец' : 'Участник'}
+                        </Label>
+                      ),
+                    },
+                  ]}
+                  getRowId={(m) => String(m.user_id)}
+                  emptyMessage="Нет участников"
+                  getRowActions={(m: OrganizationMember) => [
+                    {
+                      text: 'Удалить',
+                      handler: () => removeMemberMutation.mutate(m.user_id),
+                      theme: 'danger' as const,
+                    },
+                  ]}
+                  rowActionsSize="m"
+                />
+
+                <div style={{ borderTop: '1px solid var(--g-color-line-generic)', paddingTop: '1rem' }}>
+                  <Text variant="subheader-2" style={{ marginBottom: 8, display: 'block' }}>Добавить участника</Text>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                    <NumberInput
+                      value={addMemberUserId ?? undefined}
+                      onUpdate={(v) => setAddMemberUserId(v ?? null)}
+                      placeholder="ID пользователя"
+                      min={1}
+                      hiddenControls
+                      size="m"
+                    />
+                    <Select
+                      value={addMemberRole}
+                      onUpdate={setAddMemberRole}
+                      options={[
+                        { value: 'member', content: 'Участник' },
+                        { value: 'owner', content: 'Владелец' },
+                      ]}
+                      size="m"
+                      width={140}
+                    />
+                    <Button
+                      view="action"
+                      size="m"
+                      disabled={!addMemberUserId || addMemberUserId < 1}
+                      loading={addMemberMutation.isPending}
+                      onClick={() => addMemberMutation.mutate()}
+                    >
+                      <Icon data={Plus} size={14} />
+                      Добавить
+                    </Button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <Alert theme="danger" message="Не удалось загрузить данные" />
+            )}
+          </div>
+        </Dialog.Body>
+        <Dialog.Footer
+          onClickButtonCancel={() => setSelectedOrgId(null)}
+          textButtonCancel="Закрыть"
         />
       </Dialog>
     </div>

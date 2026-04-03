@@ -178,6 +178,7 @@ const DocumentsPage: React.FC = () => {
           page={page}
           pageSize={PAGE_SIZE}
           isAdmin={isAdmin}
+          currentUserId={user?.id}
           isLoading={isLoading}
           sortKey={sortKey}
           sortDir={sortDir}

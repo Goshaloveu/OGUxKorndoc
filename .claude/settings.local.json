@@ -6,7 +6,8 @@
   "permissions": {
     "allow": [
       "Bash(wait && cat /tmp/claude-1000/-home-georgiy-projects-OGUxKorndoc/1e0aa768-6f4c-4258-9114-b9eaaad7fe16/tasks/bvfsvfkpl.output 2>&1 | tail -100)",
-      "Bash(docker stats:*)"
+      "Bash(docker stats:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

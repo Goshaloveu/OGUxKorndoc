@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict
 from shared.database import get_db
-from shared.minio_client import download_file, generate_presigned_url, upload_file
+from shared.minio_client import delete_file, download_file, generate_presigned_url, upload_file
 from shared.models import AuditLog, Document, DocumentPermission, OrganizationMember, User
 from shared.security import get_current_user
 from sqlalchemy import func, or_, select
@@ -79,6 +79,30 @@ class DocumentPreviewOut(BaseModel):
 class PresignedUrlOut(BaseModel):
     url: str
     expires_in: int
+
+
+class UpdateDocumentRequest(BaseModel):
+    title: str | None = None
+    tags: list[str] | None = None
+    folder_path: str | None = None
+    department: str | None = None
+
+
+class PermissionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    document_id: int
+    user_id: int | None
+    org_id: int | None
+    level: str
+    granted_by: int
+    granted_at: datetime
+
+
+class AddPermissionRequest(BaseModel):
+    user_id: int | None = None
+    org_id: int | None = None
+    level: str  # "viewer" | "editor" | "owner"
 
 
 # ---------------------------------------------------------------------------
@@ -351,8 +375,173 @@ async def get_presigned_url(
 
 
 # ---------------------------------------------------------------------------
+# PATCH / DELETE document
+# ---------------------------------------------------------------------------
+
+
+@router.patch("/{document_id}", response_model=DocumentOut)
+async def update_document(
+    document_id: int,
+    body: UpdateDocumentRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update document metadata (title, tags, folder_path, department). Requires editor access."""
+    doc = await check_document_access(document_id, "editor", current_user, db)
+
+    if body.title is not None:
+        doc.title = body.title
+    if body.tags is not None:
+        doc.tags = body.tags
+    if body.folder_path is not None:
+        doc.folder_path = body.folder_path
+    if body.department is not None:
+        doc.department = body.department
+
+    await db.commit()
+    await db.refresh(doc)
+    return DocumentOut.model_validate(doc)
+
+
+@router.delete("/{document_id}", status_code=204)
+async def delete_document_endpoint(
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a document (owner or admin). Removes file from MinIO and vectors from Qdrant."""
+    doc = await check_document_access(document_id, "owner", current_user, db)
+
+    # Delete from MinIO
+    try:
+        await asyncio.get_running_loop().run_in_executor(None, delete_file, doc.minio_path)
+    except Exception as exc:
+        logger.warning("Failed to delete MinIO object %s: %s", doc.minio_path, exc)
+
+    # Delete vectors from Qdrant
+    try:
+        await asyncio.get_running_loop().run_in_executor(None, _delete_qdrant_vectors, document_id)
+    except Exception as exc:
+        logger.warning("Failed to delete Qdrant vectors for doc %d: %s", document_id, exc)
+
+    # Audit log
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="delete",
+        resource_type="document",
+        resource_id=str(document_id),
+        details={"title": doc.title, "filename": doc.filename},
+    )
+    db.add(audit)
+
+    await db.delete(doc)
+    await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Permissions endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{document_id}/permissions", response_model=list[PermissionOut])
+async def list_permissions(
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all permissions for a document. Requires owner access."""
+    await check_document_access(document_id, "owner", current_user, db)
+
+    result = await db.execute(
+        select(DocumentPermission).where(DocumentPermission.document_id == document_id)
+    )
+    perms = result.scalars().all()
+    return [PermissionOut.model_validate(p) for p in perms]
+
+
+@router.post("/{document_id}/permissions", response_model=PermissionOut, status_code=201)
+async def add_permission(
+    document_id: int,
+    body: AddPermissionRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Grant access to a document. Requires owner access."""
+    await check_document_access(document_id, "owner", current_user, db)
+
+    if body.level not in ("viewer", "editor", "owner"):
+        raise HTTPException(status_code=400, detail="Уровень должен быть viewer, editor или owner")
+
+    # Exactly one of user_id/org_id must be set
+    if (body.user_id is None) == (body.org_id is None):
+        raise HTTPException(status_code=400, detail="Укажите ровно одно из: user_id или org_id")
+
+    perm = DocumentPermission(
+        document_id=document_id,
+        user_id=body.user_id,
+        org_id=body.org_id,
+        level=body.level,
+        granted_by=current_user.id,
+    )
+    db.add(perm)
+
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="share",
+        resource_type="document",
+        resource_id=str(document_id),
+        details={
+            "target_user_id": body.user_id,
+            "target_org_id": body.org_id,
+            "level": body.level,
+        },
+    )
+    db.add(audit)
+
+    await db.commit()
+    await db.refresh(perm)
+    return PermissionOut.model_validate(perm)
+
+
+@router.delete("/{document_id}/permissions/{permission_id}", status_code=204)
+async def remove_permission(
+    document_id: int,
+    permission_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Revoke a permission. Requires owner access."""
+    await check_document_access(document_id, "owner", current_user, db)
+
+    perm = await db.get(DocumentPermission, permission_id)
+    if perm is None or perm.document_id != document_id:
+        raise HTTPException(status_code=404, detail="Разрешение не найдено")
+
+    await db.delete(perm)
+    await db.commit()
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _delete_qdrant_vectors(document_id: int) -> None:
+    """Delete all vectors associated with a document from Qdrant."""
+    try:
+        from qdrant_client import QdrantClient
+        from qdrant_client.models import FieldCondition, Filter, MatchValue
+        from shared.config import settings as s
+
+        client = QdrantClient(host=s.qdrant_host, port=s.qdrant_port, timeout=10)
+        client.delete(
+            collection_name=s.qdrant_collection,
+            points_selector=Filter(
+                must=[FieldCondition(key="document_id", match=MatchValue(value=document_id))]
+            ),
+        )
+    except Exception as exc:
+        logger.warning("Qdrant vector deletion failed for doc %d: %s", document_id, exc)
 
 
 def _extract_text_preview(file_data: bytes, file_type: str) -> str:

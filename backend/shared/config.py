@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 480
 
     # Embedding
-    embedding_model: str = "paraphrase-multilingual-mpnet-base-v2"
+    embedding_model: str = "google/embeddinggemma-300m"
     embedding_dim: int = 768
     chunk_size: int = 2048
     chunk_overlap: int = 256

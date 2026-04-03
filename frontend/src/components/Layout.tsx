@@ -1,29 +1,46 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Button, Icon, Text } from '@gravity-ui/uikit';
-import { Magnifier, ArrowUpFromLine, Folder, Person, Gear } from '@gravity-ui/icons';
-import type { IconData } from '@gravity-ui/uikit';
+import { Icon, Text, Select, SegmentedRadioGroup } from '@gravity-ui/uikit';
+import { AsideHeader, FooterItem } from '@gravity-ui/navigation';
+import {
+  Magnifier,
+  ArrowUpFromLine,
+  Folder,
+  Person,
+  Gear,
+  EyeDashed,
+  Sun,
+  Moon,
+  ArrowRightFromSquare,
+  CircleQuestion,
+} from '@gravity-ui/icons';
 import { useAuth } from '../hooks/useAuth';
+import { useThemeContext } from '../hooks/useTheme';
+import type { AppLang } from '../hooks/useTheme';
 import './Layout.css';
 
-interface NavItem {
-  to: string;
-  label: string;
-  icon: IconData;
-}
+const LANG_OPTIONS = [
+  { value: 'ru', content: 'RU' },
+  { value: 'en', content: 'EN' },
+];
 
-function getInitials(name: string): string {
-  return name
-    .split(/[\s._-]+/)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? '')
-    .join('');
+const COMPACT_KEY = 'aside-compact';
+
+function loadCompact(): boolean {
+  return localStorage.getItem(COMPACT_KEY) === 'true';
 }
 
 const Layout: React.FC = () => {
   const { user, isLoading, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { theme, setTheme, lang, setLang } = useThemeContext();
+  const [compact, setCompactState] = useState(loadCompact);
+
+  const handleCompact = (v: boolean) => {
+    setCompactState(v);
+    localStorage.setItem(COMPACT_KEY, String(v));
+  };
 
   if (isLoading) {
     return (
@@ -33,65 +50,136 @@ const Layout: React.FC = () => {
     );
   }
 
-  const navItems: NavItem[] = [
-    { to: '/', label: 'Поиск', icon: Magnifier },
-    { to: '/upload', label: 'Загрузить', icon: ArrowUpFromLine },
-    { to: '/documents', label: 'Документы', icon: Folder },
-    { to: '/profile', label: 'Профиль', icon: Person },
-    ...(user?.role === 'admin'
-      ? [{ to: '/admin', label: 'Администрирование', icon: Gear }]
-      : []),
-  ];
-
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
   };
 
-  const initials = user ? getInitials(user.username) || user.username.slice(0, 2).toUpperCase() : '?';
+  const menuItems = [
+    {
+      id: 'search',
+      title: 'Поиск',
+      icon: Magnifier,
+      current: isActive('/'),
+      onItemClick: () => navigate('/'),
+    },
+    {
+      id: 'upload',
+      title: 'Загрузить',
+      icon: ArrowUpFromLine,
+      current: isActive('/upload'),
+      onItemClick: () => navigate('/upload'),
+    },
+    {
+      id: 'documents',
+      title: 'Документы',
+      icon: Folder,
+      current: isActive('/documents'),
+      onItemClick: () => navigate('/documents'),
+    },
+    {
+      id: 'profile',
+      title: 'Профиль',
+      icon: Person,
+      current: isActive('/profile'),
+      onItemClick: () => navigate('/profile'),
+    },
+    ...(user?.role === 'admin'
+      ? [
+          {
+            id: 'divider-admin',
+            title: '',
+            type: 'divider' as const,
+          },
+          {
+            id: 'admin',
+            title: 'Администрирование',
+            icon: EyeDashed,
+            current: isActive('/admin'),
+            onItemClick: () => navigate('/admin'),
+          },
+        ]
+      : []),
+  ];
 
   return (
-    <div className="layout">
-      <aside className="layout-sidebar">
-        <div className="layout-logo">
-          <div className="layout-logo-icon"></div>
-          <span className="layout-logo-text">КорнДок</span>
-        </div>
-        <nav className="layout-nav">
-          {navItems.map((item) => (
-            <button
-              key={item.to}
-              className={`nav-item${isActive(item.to) ? ' active' : ''}`}
-              onClick={() => navigate(item.to)}
-            >
-              <span className="nav-item-icon">
-                <Icon data={item.icon} size={18} />
-              </span>
-              {item.label}
-            </button>
-          ))}
-        </nav>
-      </aside>
-      <div className="layout-main">
-        <header className="layout-header">
-          <div className="layout-header-user">
-            <div className="layout-header-info">
-              <Text variant="body-2" style={{ fontWeight: 600 }}>{user?.username}</Text>
+    <AsideHeader
+      logo={{
+        text: 'КорнДок',
+        iconSrc: '/logo.svg',
+        iconSize: 32,
+        href: '/',
+        onClick: () => navigate('/'),
+      }}
+      compact={compact}
+      onChangeCompact={handleCompact}
+      headerDecoration
+      menuItems={menuItems}
+      renderFooter={() => (
+        <div className="layout-footer">
+          {!compact && user && (
+            <div className="layout-footer-user">
               <Text variant="caption-2" color="secondary">
-                {user?.role === 'admin' ? 'Администратор' : 'Пользователь'}
+                {user.username}
+              </Text>
+              <Text variant="caption-2" color="hint">
+                {user.role === 'admin' ? 'Администратор' : 'Пользователь'}
               </Text>
             </div>
-            <div className="layout-avatar">{initials}</div>
+          )}
+          <FooterItem
+            id="faq"
+            title="FAQ"
+            icon={CircleQuestion}
+            onItemClick={() => {}}
+          />
+          <FooterItem
+            id="settings"
+            title="Настройки"
+            icon={Gear}
+            onItemClick={() => {}}
+          />
+          <FooterItem
+            id="logout"
+            title="Выйти"
+            icon={ArrowRightFromSquare}
+            onItemClick={logout}
+          />
+        </div>
+      )}
+      renderContent={() => (
+        <div className="layout-main">
+          <div className="layout-header">
+            <div className="layout-header-right">
+              <SegmentedRadioGroup
+                size="m"
+                value={theme}
+                onUpdate={(val) => setTheme(val as 'light' | 'dark')}
+              >
+                <SegmentedRadioGroup.Option value="light">
+                  <Icon data={Sun} size={16} />
+                </SegmentedRadioGroup.Option>
+                <SegmentedRadioGroup.Option value="dark">
+                  <Icon data={Moon} size={16} />
+                </SegmentedRadioGroup.Option>
+              </SegmentedRadioGroup>
+              {!compact && (
+                <Select
+                  size="m"
+                  value={[lang]}
+                  options={LANG_OPTIONS}
+                  onUpdate={(value) => setLang(value[0] as AppLang)}
+                  width={70}
+                />
+              )}
+            </div>
           </div>
-          <Button view="outlined" size="s" onClick={logout}>
-            Выйти
-          </Button>
-        </header>
-        <main className="layout-content">
-          <Outlet />
-        </main>
-      </div>
-    </div>
+          <main className="layout-content">
+            <Outlet />
+          </main>
+        </div>
+      )}
+    />
   );
 };
 
