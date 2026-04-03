@@ -1,5 +1,8 @@
 import React from 'react';
 import { Select, TextInput, Text } from '@gravity-ui/uikit';
+import { DatePicker } from '@gravity-ui/date-components';
+import { dateTime } from '@gravity-ui/date-utils';
+import type { DateTime } from '@gravity-ui/date-utils';
 import type { SearchFilters as SearchFiltersType } from '../types';
 
 interface SearchFiltersProps {
@@ -24,12 +27,12 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({ filters, onChange }) => {
     onChange({ ...filters, department: value || undefined });
   };
 
-  const handleDateFrom = (value: string) => {
-    onChange({ ...filters, date_from: value || undefined });
+  const handleDateFrom = (value: DateTime | null) => {
+    onChange({ ...filters, date_from: value ? value.format('YYYY-MM-DD') : undefined });
   };
 
-  const handleDateTo = (value: string) => {
-    onChange({ ...filters, date_to: value || undefined });
+  const handleDateTo = (value: DateTime | null) => {
+    onChange({ ...filters, date_to: value ? value.format('YYYY-MM-DD') : undefined });
   };
 
   return (
@@ -73,19 +76,12 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({ filters, onChange }) => {
         <Text variant="caption-2" color="secondary">
           С даты
         </Text>
-        <input
-          type="date"
-          value={filters.date_from ?? ''}
-          onChange={(e) => handleDateFrom(e.target.value)}
-          style={{
-            height: 28,
-            padding: '0 8px',
-            borderRadius: 4,
-            border: '1px solid var(--g-color-line-generic)',
-            background: 'var(--g-color-base-background)',
-            color: 'var(--g-color-text-primary)',
-            fontSize: 13,
-          }}
+        <DatePicker
+          size="s"
+          format="DD.MM.YYYY"
+          value={filters.date_from ? dateTime({ input: filters.date_from }) : null}
+          onUpdate={handleDateFrom}
+          hasClear
         />
       </div>
 
@@ -93,19 +89,12 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({ filters, onChange }) => {
         <Text variant="caption-2" color="secondary">
           По дату
         </Text>
-        <input
-          type="date"
-          value={filters.date_to ?? ''}
-          onChange={(e) => handleDateTo(e.target.value)}
-          style={{
-            height: 28,
-            padding: '0 8px',
-            borderRadius: 4,
-            border: '1px solid var(--g-color-line-generic)',
-            background: 'var(--g-color-base-background)',
-            color: 'var(--g-color-text-primary)',
-            fontSize: 13,
-          }}
+        <DatePicker
+          size="s"
+          format="DD.MM.YYYY"
+          value={filters.date_to ? dateTime({ input: filters.date_to }) : null}
+          onUpdate={handleDateTo}
+          hasClear
         />
       </div>
     </div>

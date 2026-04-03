@@ -85,7 +85,7 @@ const LoginPage: React.FC = () => {
             display: 'flex',
             flexDirection: 'column',
             gap: '1.25rem',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.4)',
+            boxShadow: '0 20px 60px rgba(255, 254, 254, 0.4)',
           }}
         >
           <Text variant="subheader-3" style={{ textAlign: 'center', color: 'var(--g-color-text-secondary)' }}>

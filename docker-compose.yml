@@ -70,6 +70,7 @@ services:
     env_file: .env
     volumes:
       - ./backend/shared:/app/shared
+      - hf_cache:/root/.cache/huggingface
     ports:
       - "8000:8000"
     healthcheck:
@@ -95,6 +96,7 @@ services:
     env_file: .env
     volumes:
       - ./backend/shared:/app/shared
+      - hf_cache:/root/.cache/huggingface
 
   frontend:
     build:
@@ -125,3 +127,4 @@ volumes:
   postgres_data:
   qdrant_data:
   minio_data:
+  hf_cache:

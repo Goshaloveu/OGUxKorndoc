@@ -41,19 +41,26 @@ def _get_qdrant_client():
 
 def _ensure_collection(client) -> None:
     """Create the Qdrant collection if it does not exist yet."""
+    from qdrant_client.http.exceptions import UnexpectedResponse
     from qdrant_client.http.models import Distance, VectorParams
 
     existing = [c.name for c in client.get_collections().collections]
     if settings.qdrant_collection not in existing:
-        client.create_collection(
-            collection_name=settings.qdrant_collection,
-            vectors_config=VectorParams(size=settings.embedding_dim, distance=Distance.COSINE),
-        )
-        logger.info(
-            "Created Qdrant collection '%s' (dim=%d)",
-            settings.qdrant_collection,
-            settings.embedding_dim,
-        )
+        try:
+            client.create_collection(
+                collection_name=settings.qdrant_collection,
+                vectors_config=VectorParams(size=settings.embedding_dim, distance=Distance.COSINE),
+            )
+            logger.info(
+                "Created Qdrant collection '%s' (dim=%d)",
+                settings.qdrant_collection,
+                settings.embedding_dim,
+            )
+        except UnexpectedResponse as e:
+            if e.status_code == 409:
+                logger.info("Qdrant collection '%s' already exists (race condition ignored)", settings.qdrant_collection)
+            else:
+                raise
 
 
 # ---------------------------------------------------------------------------

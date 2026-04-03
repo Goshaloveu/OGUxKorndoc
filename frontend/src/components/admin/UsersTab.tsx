@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import {
   Button,
+  Icon,
   Label,
   Modal,
   Select,
+  Table,
   Text,
   TextInput,
 } from '@gravity-ui/uikit';
@@ -96,6 +98,89 @@ const UsersTab: React.FC = () => {
     createMutation.mutate({ email: newEmail, username: newUsername, password: newPassword, role: newRole });
   };
 
+  const columns = [
+    {
+      id: 'username',
+      name: 'Пользователь',
+      template: (u: AdminUser) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Icon data={Person} size={16} />
+          <Text variant="body-1">{u.username}</Text>
+        </div>
+      ),
+    },
+    {
+      id: 'email',
+      name: 'Email',
+      template: (u: AdminUser) => (
+        <Text variant="body-1" color="secondary">{u.email}</Text>
+      ),
+    },
+    {
+      id: 'role',
+      name: 'Роль',
+      template: (u: AdminUser) => (
+        <Label theme={ROLE_THEMES[u.role]} size="s">{ROLE_LABELS[u.role]}</Label>
+      ),
+    },
+    {
+      id: 'status',
+      name: 'Статус',
+      template: (u: AdminUser) => (
+        <Label theme={u.is_active ? 'success' : 'danger'} size="s">
+          {u.is_active ? 'Активен' : 'Деактивирован'}
+        </Label>
+      ),
+    },
+    {
+      id: 'created_at',
+      name: 'Дата регистрации',
+      template: (u: AdminUser) => (
+        <Text variant="body-1">{formatDate(u.created_at)}</Text>
+      ),
+    },
+    {
+      id: 'last_login',
+      name: 'Последний вход',
+      template: (u: AdminUser) => (
+        <Text variant="body-1" color="secondary">
+          {u.last_login ? formatDate(u.last_login) : '—'}
+        </Text>
+      ),
+    },
+    {
+      id: 'actions',
+      name: 'Действия',
+      template: (u: AdminUser) => (
+        <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+          <Button
+            view="outlined"
+            size="s"
+            onClick={() =>
+              updateMutation.mutate({
+                id: u.id,
+                params: { role: u.role === 'admin' ? 'user' : 'admin' },
+              })
+            }
+            title={u.role === 'admin' ? 'Снять права admin' : 'Назначить admin'}
+          >
+            {u.role === 'admin' ? 'user' : 'admin'}
+          </Button>
+          {u.is_active && (
+            <Button
+              view="outlined-danger"
+              size="s"
+              onClick={() => setDeactivateTarget(u)}
+              title="Деактивировать"
+            >
+              <Icon data={TrashBin} size={14} />
+            </Button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
   if (isLoading) {
     return <Text color="secondary">Загрузка...</Text>;
   }
@@ -107,97 +192,17 @@ const UsersTab: React.FC = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <Button view="action" onClick={() => setCreateOpen(true)}>
-          <Plus width={16} height={16} />
+          <Icon data={Plus} size={16} />
           Создать пользователя
         </Button>
       </div>
 
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-          <thead>
-            <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-              <th style={{ padding: '8px 12px', textAlign: 'left' }}>Пользователь</th>
-              <th style={{ padding: '8px 12px', textAlign: 'left' }}>Email</th>
-              <th style={{ padding: '8px 12px', textAlign: 'left' }}>Роль</th>
-              <th style={{ padding: '8px 12px', textAlign: 'left' }}>Статус</th>
-              <th style={{ padding: '8px 12px', textAlign: 'left' }}>Дата регистрации</th>
-              <th style={{ padding: '8px 12px', textAlign: 'left' }}>Последний вход</th>
-              <th style={{ padding: '8px 12px', textAlign: 'center' }}>Действия</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(users ?? []).length === 0 ? (
-              <tr>
-                <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#888' }}>
-                  Пользователей не найдено
-                </td>
-              </tr>
-            ) : (
-              (users ?? []).map((u) => (
-                <tr
-                  key={u.id}
-                  style={{ borderBottom: '1px solid #f0f0f0' }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = '#fafafa'; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'; }}
-                >
-                  <td style={{ padding: '8px 12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <Person width={16} height={16} />
-                      <Text variant="body-1">{u.username}</Text>
-                    </div>
-                  </td>
-                  <td style={{ padding: '8px 12px' }}>
-                    <Text variant="body-1" color="secondary">{u.email}</Text>
-                  </td>
-                  <td style={{ padding: '8px 12px' }}>
-                    <Label theme={ROLE_THEMES[u.role]} size="s">{ROLE_LABELS[u.role]}</Label>
-                  </td>
-                  <td style={{ padding: '8px 12px' }}>
-                    <Label theme={u.is_active ? 'success' : 'danger'} size="s">
-                      {u.is_active ? 'Активен' : 'Деактивирован'}
-                    </Label>
-                  </td>
-                  <td style={{ padding: '8px 12px' }}>
-                    <Text variant="body-1">{formatDate(u.created_at)}</Text>
-                  </td>
-                  <td style={{ padding: '8px 12px' }}>
-                    <Text variant="body-1" color="secondary">
-                      {u.last_login ? formatDate(u.last_login) : '—'}
-                    </Text>
-                  </td>
-                  <td style={{ padding: '8px 12px' }}>
-                    <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
-                      <Button
-                        view="outlined"
-                        size="s"
-                        onClick={() =>
-                          updateMutation.mutate({
-                            id: u.id,
-                            params: { role: u.role === 'admin' ? 'user' : 'admin' },
-                          })
-                        }
-                        title={u.role === 'admin' ? 'Снять права admin' : 'Назначить admin'}
-                      >
-                        {u.role === 'admin' ? 'user' : 'admin'}
-                      </Button>
-                      {u.is_active && (
-                        <Button
-                          view="outlined-danger"
-                          size="s"
-                          onClick={() => setDeactivateTarget(u)}
-                          title="Деактивировать"
-                        >
-                          <TrashBin width={14} height={14} />
-                        </Button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <Table
+        data={users ?? []}
+        columns={columns}
+        getRowId={(u) => String(u.id)}
+        emptyMessage="Пользователей не найдено"
+      />
 
       {/* Create user modal */}
       <Modal open={createOpen} onClose={() => setCreateOpen(false)}>

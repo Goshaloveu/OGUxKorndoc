@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, Skeleton } from '@gravity-ui/uikit';
+import { Card, Label, Text, Skeleton } from '@gravity-ui/uikit';
 import { useQuery } from '@tanstack/react-query';
 import { getSystemHealth } from '../../api/admin';
 import type { SystemHealth, ServiceHealth } from '../../api/admin';
@@ -12,38 +12,15 @@ interface ServiceCardProps {
 const ServiceCard: React.FC<ServiceCardProps> = ({ name, health }) => {
   const isOk = health.status === 'ok';
   return (
-    <div
-      style={{
-        background: '#fff',
-        border: `2px solid ${isOk ? '#27ae60' : '#e74c3c'}`,
-        borderRadius: 8,
-        padding: '1.25rem 1.5rem',
-        minWidth: 160,
-        flex: '1 1 160px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.5rem',
-      }}
+    <Card
+      view="outlined"
+      style={{ padding: '1.25rem 1.5rem', minWidth: 160, flex: '1 1 160px' }}
     >
-      <Text variant="subheader-2">{name}</Text>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <div
-          style={{
-            width: 10,
-            height: 10,
-            borderRadius: '50%',
-            background: isOk ? '#27ae60' : '#e74c3c',
-            flexShrink: 0,
-          }}
-        />
-        <Text
-          variant="body-1"
-          style={{ color: isOk ? '#27ae60' : '#e74c3c', fontWeight: 600 }}
-        >
-          {isOk ? 'Работает' : (health.error ?? health.status)}
-        </Text>
-      </div>
-    </div>
+      <Text variant="subheader-2" style={{ display: 'block', marginBottom: '0.5rem' }}>{name}</Text>
+      <Label theme={isOk ? 'success' : 'danger'}>
+        {isOk ? 'Работает' : (health.error ?? health.status)}
+      </Label>
+    </Card>
   );
 };
 

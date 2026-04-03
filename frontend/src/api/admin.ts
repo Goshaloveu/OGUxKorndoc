@@ -111,3 +111,16 @@ export async function getSystemHealth(): Promise<SystemHealth> {
   const response = await api.get<SystemHealth>('/admin/system/health');
   return response.data;
 }
+
+export interface AdminOrganization {
+  id: number;
+  name: string;
+  slug: string;
+  created_by: number;
+  created_at: string;
+}
+
+export async function getAdminOrganizations(): Promise<AdminOrganization[]> {
+  const response = await api.get<AdminOrganization[]>('/admin/organizations');
+  return response.data;
+}

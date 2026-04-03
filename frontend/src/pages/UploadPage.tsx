@@ -196,13 +196,13 @@ const UploadPage: React.FC = () => {
         onDrop={handleDrop}
         onClick={() => fileInputRef.current?.click()}
         style={{
-          border: `2px dashed ${isDragOver ? '#5b67ff' : 'var(--g-color-line-generic-accent)'}`,
+          border: `2px dashed ${isDragOver ? 'var(--g-color-line-brand)' : 'var(--g-color-line-generic-accent)'}`,
           borderRadius: 16,
           padding: '3rem 2rem',
           textAlign: 'center',
           cursor: 'pointer',
           background: isDragOver
-            ? 'rgba(91, 103, 255, 0.06)'
+            ? 'var(--g-color-base-selection)'
             : 'var(--g-color-base-simple-hover-solid)',
           transition: 'all 0.2s',
           display: 'flex',
@@ -217,7 +217,7 @@ const UploadPage: React.FC = () => {
             height: 64,
             borderRadius: 16,
             background: isDragOver
-              ? 'rgba(91, 103, 255, 0.15)'
+              ? 'var(--g-color-base-selection-hover)'
               : 'var(--g-color-base-misc-light)',
             display: 'flex',
             alignItems: 'center',
@@ -339,7 +339,7 @@ const UploadPage: React.FC = () => {
             <div
               key={item.localId}
               style={{
-                border: '1px solid #e0e0e0',
+                border: '1px solid var(--g-color-line-generic)',
                 borderRadius: 8,
                 padding: '0.75rem 1rem',
                 display: 'flex',

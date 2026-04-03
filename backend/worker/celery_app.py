@@ -1,8 +1,10 @@
 """
 Celery application for the document processing worker.
 
-The embedding model is loaded once at module initialisation (singleton pattern)
-so it is shared across all tasks executed by the same worker process.
+The embedding model is loaded once per worker process via the
+worker_process_init signal — before any task runs. This ensures
+that even with Celery's prefork pool each forked process has its
+own loaded copy and never loads on-demand inside a task.
 """
 
 import logging
@@ -10,6 +12,7 @@ import os
 import sys
 
 from celery import Celery
+from celery.signals import worker_process_init
 
 # Ensure shared/ is importable (mounted at /app/shared in Docker, or at
 # backend/shared when running locally from the repo root).
@@ -42,19 +45,26 @@ celery_app.conf.update(
 
 # ---------------------------------------------------------------------------
 # Embedding model singleton
-# Loaded once when the worker process starts (module-level init).
+# Loaded once per forked worker process via worker_process_init signal.
 # ---------------------------------------------------------------------------
 
 _embedder = None
 
 
-def get_embedder():
-    """Return the embedding model singleton, loading it on first call."""
+@worker_process_init.connect
+def _load_model_on_worker_init(**kwargs):
+    """Pre-load the embedding model when each worker process starts."""
     global _embedder
-    if _embedder is None:
-        logger.info("Loading embedding model: %s", settings.embedding_model)
-        from sentence_transformers import SentenceTransformer
+    logger.info("Worker process init: loading embedding model %s", settings.embedding_model)
+    from sentence_transformers import SentenceTransformer
 
-        _embedder = SentenceTransformer(settings.embedding_model)
-        logger.info("Embedding model loaded (dim=%d)", settings.embedding_dim)
+    _embedder = SentenceTransformer(settings.embedding_model)
+    logger.info("Embedding model loaded (dim=%d)", settings.embedding_dim)
+
+
+def get_embedder():
+    """Return the embedding model singleton (guaranteed loaded by worker_process_init)."""
+    if _embedder is None:
+        # Fallback: called outside prefork context (e.g. tests / solo pool)
+        _load_model_on_worker_init()
     return _embedder
