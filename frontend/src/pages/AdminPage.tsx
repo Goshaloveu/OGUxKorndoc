@@ -5,9 +5,10 @@ import StatsTab from '../components/admin/StatsTab';
 import AuditLogTab from '../components/admin/AuditLogTab';
 import HealthTab from '../components/admin/HealthTab';
 import OrganizationsTab from '../components/admin/OrganizationsTab';
+import DocumentsTab from '../components/admin/DocumentsTab';
 import ErrorBoundary from '../components/ErrorBoundary';
 
-type TabId = 'users' | 'stats' | 'audit' | 'health' | 'orgs';
+type TabId = 'users' | 'orgs' | 'documents' | 'stats' | 'audit' | 'health';
 
 const AdminPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>('users');
@@ -19,10 +20,11 @@ const AdminPage: React.FC = () => {
       <TabProvider value={activeTab} onUpdate={(v) => setActiveTab(v as TabId)}>
         <TabList size="l">
           <Tab value="users">Пользователи</Tab>
+          <Tab value="orgs">Организации</Tab>
+          <Tab value="documents">Документы</Tab>
           <Tab value="stats">Статистика</Tab>
           <Tab value="audit">Журнал действий</Tab>
           <Tab value="health">Здоровье системы</Tab>
-          <Tab value="orgs">Организации</Tab>
         </TabList>
       </TabProvider>
 
@@ -30,6 +32,16 @@ const AdminPage: React.FC = () => {
         {activeTab === 'users' && (
           <ErrorBoundary fallbackTitle="Ошибка вкладки «Пользователи»">
             <UsersTab />
+          </ErrorBoundary>
+        )}
+        {activeTab === 'orgs' && (
+          <ErrorBoundary fallbackTitle="Ошибка вкладки «Организации»">
+            <OrganizationsTab />
+          </ErrorBoundary>
+        )}
+        {activeTab === 'documents' && (
+          <ErrorBoundary fallbackTitle="Ошибка вкладки «Документы»">
+            <DocumentsTab />
           </ErrorBoundary>
         )}
         {activeTab === 'stats' && (
@@ -45,11 +57,6 @@ const AdminPage: React.FC = () => {
         {activeTab === 'health' && (
           <ErrorBoundary fallbackTitle="Ошибка вкладки «Здоровье системы»">
             <HealthTab />
-          </ErrorBoundary>
-        )}
-        {activeTab === 'orgs' && (
-          <ErrorBoundary fallbackTitle="Ошибка вкладки «Организации»">
-            <OrganizationsTab />
           </ErrorBoundary>
         )}
       </div>

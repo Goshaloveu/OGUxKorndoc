@@ -52,7 +52,6 @@ class DocumentOut(BaseModel):
     page_count: int | None
     chunk_count: int | None
     tags: list
-    department: str | None
 
 
 class DocumentListOut(BaseModel):

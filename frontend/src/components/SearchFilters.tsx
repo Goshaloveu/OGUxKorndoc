@@ -1,5 +1,5 @@
 import React from 'react';
-import { Select, TextInput, Text } from '@gravity-ui/uikit';
+import { Select, Text } from '@gravity-ui/uikit';
 import { DatePicker } from '@gravity-ui/date-components';
 import { dateTime } from '@gravity-ui/date-utils';
 import type { DateTime } from '@gravity-ui/date-utils';
@@ -21,10 +21,6 @@ const FILE_TYPE_OPTIONS = [
 const SearchFilters: React.FC<SearchFiltersProps> = ({ filters, onChange }) => {
   const handleFileType = (values: string[]) => {
     onChange({ ...filters, file_type: values[0] || undefined });
-  };
-
-  const handleDepartment = (value: string) => {
-    onChange({ ...filters, department: value || undefined });
   };
 
   const handleDateFrom = (value: DateTime | null) => {
@@ -57,18 +53,6 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({ filters, onChange }) => {
           onUpdate={handleFileType}
           options={FILE_TYPE_OPTIONS}
           width={140}
-        />
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 160 }}>
-        <Text variant="caption-2" color="secondary">
-          Отдел
-        </Text>
-        <TextInput
-          size="s"
-          placeholder="Все отделы"
-          value={filters.department ?? ''}
-          onUpdate={handleDepartment}
         />
       </div>
 

@@ -163,15 +163,13 @@ const Layout: React.FC = () => {
                   <Icon data={Moon} size={16} />
                 </SegmentedRadioGroup.Option>
               </SegmentedRadioGroup>
-              {!compact && (
-                <Select
-                  size="m"
-                  value={[lang]}
-                  options={LANG_OPTIONS}
-                  onUpdate={(value) => setLang(value[0] as AppLang)}
-                  width={70}
-                />
-              )}
+              <Select
+                size="m"
+                value={[lang]}
+                options={LANG_OPTIONS}
+                onUpdate={(value) => setLang(value[0] as AppLang)}
+                width={70}
+              />
             </div>
           </div>
           <main className="layout-content">

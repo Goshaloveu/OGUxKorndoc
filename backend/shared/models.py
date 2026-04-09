@@ -111,7 +111,6 @@ class Document(Base):
     page_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     chunk_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     tags: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
-    department: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     uploader: Mapped["User"] = relationship(
         "User", back_populates="documents", foreign_keys=[uploaded_by]

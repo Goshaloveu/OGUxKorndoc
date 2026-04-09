@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Button, Text, TextInput, Select, Label, Alert, Progress } from '@gravity-ui/uikit';
+import { Button, Text, TextInput, Label, Alert, Progress } from '@gravity-ui/uikit';
 import { uploadDocument, getDocumentStatus } from '../api/documents';
 import type { UploadDocumentParams } from '../api/documents';
 
@@ -12,15 +12,6 @@ interface UploadItem {
   documentId: number | null;
   errorMsg: string | null;
 }
-
-const DEPARTMENT_OPTIONS = [
-  { value: '', content: '— не выбран —' },
-  { value: 'hr', content: 'HR' },
-  { value: 'legal', content: 'Юридический' },
-  { value: 'it', content: 'ИТ' },
-  { value: 'finance', content: 'Финансы' },
-  { value: 'marketing', content: 'Маркетинг' },
-];
 
 const STATUS_TEXT: Record<UploadItem['status'], string> = {
   waiting: '⏳ Ожидает',
@@ -36,7 +27,6 @@ const UploadPage: React.FC = () => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
-  const [department, setDepartment] = useState('');
   const [folderPath, setFolderPath] = useState('/');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queueRef = useRef<UploadItem[]>([]);
@@ -137,7 +127,6 @@ const UploadPage: React.FC = () => {
           title: item.title || undefined,
           folder_path: folderPath || undefined,
           tags: tags.length > 0 ? tags : undefined,
-          department: department || undefined,
           onUploadProgress: (percent) => {
             setQueue((prev) =>
               prev.map((q) =>
@@ -166,7 +155,7 @@ const UploadPage: React.FC = () => {
         );
       }
     }
-  }, [folderPath, tags, department]);
+  }, [folderPath, tags]);
 
   const removeFromQueue = useCallback((localId: string) => {
     setQueue((prev) => prev.filter((q) => q.localId !== localId));
@@ -260,18 +249,6 @@ const UploadPage: React.FC = () => {
               value={folderPath}
               onUpdate={setFolderPath}
               placeholder="/папка/подпапка/"
-            />
-          </div>
-          <div style={{ flex: 1 }}>
-            <Text variant="body-2" style={{ marginBottom: 4, display: 'block' }}>
-              Отдел
-            </Text>
-            <Select
-              value={department ? [department] : []}
-              onUpdate={(val) => setDepartment(val[0] ?? '')}
-              options={DEPARTMENT_OPTIONS}
-              placeholder="Выбрать отдел"
-              width="max"
             />
           </div>
         </div>

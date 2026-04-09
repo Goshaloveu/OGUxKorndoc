@@ -20,7 +20,6 @@ export interface UploadDocumentParams {
   title?: string;
   folder_path?: string;
   tags?: string[];
-  department?: string;
   org_id?: number;
   onUploadProgress?: (percent: number) => void;
 }
@@ -33,7 +32,6 @@ export async function uploadDocument(params: UploadDocumentParams): Promise<Docu
   if (params.tags && params.tags.length > 0) {
     formData.append('tags', JSON.stringify(params.tags));
   }
-  if (params.department) formData.append('department', params.department);
   if (params.org_id !== undefined) formData.append('org_id', String(params.org_id));
 
   const response = await api.post<Document>('/documents/upload', formData, {
@@ -66,7 +64,6 @@ export interface UpdateDocumentParams {
   title?: string;
   tags?: string[];
   folder_path?: string;
-  department?: string;
 }
 
 export async function updateDocument(id: number, params: UpdateDocumentParams): Promise<Document> {

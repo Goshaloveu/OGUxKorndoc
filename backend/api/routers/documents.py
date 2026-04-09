@@ -47,6 +47,7 @@ class DocumentOut(BaseModel):
     status: str
     error_message: str | None
     uploaded_by: int
+    uploaded_by_username: str | None = None
     org_id: int | None
     uploaded_at: datetime
     updated_at: datetime
@@ -54,7 +55,6 @@ class DocumentOut(BaseModel):
     page_count: int | None
     chunk_count: int | None
     tags: list
-    department: str | None
 
 
 class DocumentStatusOut(BaseModel):
@@ -85,7 +85,6 @@ class UpdateDocumentRequest(BaseModel):
     title: str | None = None
     tags: list[str] | None = None
     folder_path: str | None = None
-    department: str | None = None
 
 
 class PermissionOut(BaseModel):
@@ -118,7 +117,6 @@ async def upload_document(
     tags: str | None = Form(None),
     folder_path: str = Form("/"),
     org_id: int | None = Form(None),
-    department: str | None = Form(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -173,7 +171,6 @@ async def upload_document(
         uploaded_by=current_user.id,
         org_id=org_id,
         tags=parsed_tags,
-        department=department,
     )
     db.add(document)
     await db.flush()  # assigns document.id
@@ -258,12 +255,26 @@ async def list_documents(
     )
     documents = result.scalars().all()
 
-    return DocumentListOut(
-        items=[DocumentOut.model_validate(d) for d in documents],
-        total=total,
-        page=page,
-        limit=limit,
-    )
+    # Enrich with uploader usernames in one batch query
+    uploader_ids = list({d.uploaded_by for d in documents})
+    username_map: dict[int, str] = {}
+    if uploader_ids:
+        uname_result = await db.execute(
+            select(User.id, User.username).where(User.id.in_(uploader_ids))
+        )
+        username_map = {
+            row["id"]: row["username"]
+            for row in uname_result.mappings().all()
+        }
+
+    items = [
+        DocumentOut.model_validate(d).model_copy(
+            update={"uploaded_by_username": username_map.get(d.uploaded_by)}
+        )
+        for d in documents
+    ]
+
+    return DocumentListOut(items=items, total=total, page=page, limit=limit)
 
 
 @router.get("/{document_id}", response_model=DocumentOut)
@@ -386,7 +397,7 @@ async def update_document(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Update document metadata (title, tags, folder_path, department). Requires editor access."""
+    """Update document metadata (title, tags, folder_path). Requires editor access."""
     doc = await check_document_access(document_id, "editor", current_user, db)
 
     if body.title is not None:
@@ -395,8 +406,6 @@ async def update_document(
         doc.tags = body.tags
     if body.folder_path is not None:
         doc.folder_path = body.folder_path
-    if body.department is not None:
-        doc.department = body.department
 
     await db.commit()
     await db.refresh(doc)

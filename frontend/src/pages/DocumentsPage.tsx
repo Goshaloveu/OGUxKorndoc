@@ -45,6 +45,7 @@ const DocumentsPage: React.FC = () => {
   const [searchFilter, setSearchFilter] = useState('');
   const [fileTypeFilter, setFileTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [ownerFilter, setOwnerFilter] = useState<string[]>([]);
   const [sortKey, setSortKey] = useState<SortKey>('uploaded_at');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [viewMode, setViewMode] = useState<ViewMode>(loadViewMode);
@@ -70,6 +71,22 @@ const DocumentsPage: React.FC = () => {
       }),
   });
 
+  // Build unique owner options from all loaded documents
+  const ownerOptions = React.useMemo(() => {
+    if (!data) return [];
+    const seen = new Set<string>();
+    const opts: { value: string; content: string }[] = [];
+    for (const doc of data.items) {
+      const name = doc.uploaded_by_username ?? String(doc.uploaded_by);
+      if (!seen.has(name)) {
+        seen.add(name);
+        const isMe = doc.uploaded_by === user?.id;
+        opts.push({ value: name, content: isMe ? `${name} (вы)` : name });
+      }
+    }
+    return opts;
+  }, [data, user?.id]);
+
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -92,6 +109,13 @@ const DocumentsPage: React.FC = () => {
       );
     }
 
+    if (ownerFilter.length > 0) {
+      items = items.filter((doc) => {
+        const name = doc.uploaded_by_username ?? String(doc.uploaded_by);
+        return ownerFilter.includes(name);
+      });
+    }
+
     items.sort((a, b) => {
       let cmp = 0;
       if (sortKey === 'title') {
@@ -105,7 +129,7 @@ const DocumentsPage: React.FC = () => {
     });
 
     return items;
-  }, [data, searchFilter, sortKey, sortDir]);
+  }, [data, searchFilter, ownerFilter, sortKey, sortDir]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -131,10 +155,24 @@ const DocumentsPage: React.FC = () => {
             width="max"
           />
         </div>
+        <div style={{ minWidth: 200 }}>
+          <Select
+            value={ownerFilter}
+            onUpdate={(val) => { setOwnerFilter(val); setPage(1); }}
+            options={ownerOptions}
+            placeholder="Владелец (все)"
+            multiple
+            hasClear
+            width="max"
+            disabled={ownerOptions.length === 0}
+          />
+        </div>
 
         {data && (
           <Text variant="caption-2" color="secondary">
-            Всего: {data.total}
+            {ownerFilter.length > 0
+              ? `Показано: ${filteredAndSorted.length} / ${data.total}`
+              : `Всего: ${data.total}`}
           </Text>
         )}
 

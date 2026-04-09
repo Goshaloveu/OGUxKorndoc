@@ -9,6 +9,7 @@ import {
   Table,
   Text,
   TextInput,
+  UserLabel,
   withTableActions,
   withTableSelection,
   withTableSorting,
@@ -100,7 +101,6 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
   const [editDoc, setEditDoc] = useState<Document | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editFolder, setEditFolder] = useState('');
-  const [editDepartment, setEditDepartment] = useState('');
   const [editTags, setEditTags] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -178,7 +178,6 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
     setEditDoc(doc);
     setEditTitle(doc.title);
     setEditFolder(doc.folder_path);
-    setEditDepartment(doc.department ?? '');
     setEditTags(doc.tags.join(', '));
   };
 
@@ -189,7 +188,6 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
       params: {
         title: editTitle,
         folder_path: editFolder,
-        department: editDepartment || undefined,
         tags: editTags ? editTags.split(',').map((t) => t.trim()).filter(Boolean) : [],
       },
     });
@@ -302,19 +300,21 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
       width: 110,
     },
     {
-      id: 'folder_path',
-      name: 'Папка',
-      template: (doc: Document) => (
-        <Text
-          variant="caption-2"
-          color="secondary"
-          style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block', maxWidth: 130 }}
-          title={doc.folder_path}
-        >
-          {doc.folder_path}
-        </Text>
-      ),
-      width: 140,
+      id: 'uploaded_by',
+      name: 'Владелец',
+      template: (doc: Document) => {
+        const name = doc.uploaded_by_username ?? `#${doc.uploaded_by}`;
+        const isMe = doc.uploaded_by === currentUserId;
+        return (
+          <UserLabel
+            type="person"
+            text={isMe ? `${name} (вы)` : name}
+            size="xs"
+            view="clear"
+          />
+        );
+      },
+      width: 160,
     },
   ];
 
@@ -427,10 +427,6 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
             <div>
               <Text variant="caption-2" color="secondary" style={{ display: 'block', marginBottom: 4 }}>Папка</Text>
               <TextInput value={editFolder} onUpdate={setEditFolder} />
-            </div>
-            <div>
-              <Text variant="caption-2" color="secondary" style={{ display: 'block', marginBottom: 4 }}>Отдел</Text>
-              <TextInput value={editDepartment} onUpdate={setEditDepartment} placeholder="Необязательно" />
             </div>
             <div>
               <Text variant="caption-2" color="secondary" style={{ display: 'block', marginBottom: 4 }}>Теги (через запятую)</Text>

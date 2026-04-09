@@ -34,7 +34,6 @@ router = APIRouter(prefix="/api/search", tags=["search"])
 class SearchFilters(BaseModel):
     file_type: str | None = None
     folder_path: str | None = None
-    department: str | None = None
     org_id: int | None = None
     date_from: datetime | None = None
     date_to: datetime | None = None
@@ -277,9 +276,6 @@ async def search(
                     uploaded = uploaded.replace(tzinfo=None)
                 if uploaded > date_to:
                     continue
-            # Department filter
-            if query.filters.department and pg_doc.department != query.filters.department:
-                continue
             # Org filter
             if query.filters.org_id is not None and pg_doc.org_id != query.filters.org_id:
                 continue

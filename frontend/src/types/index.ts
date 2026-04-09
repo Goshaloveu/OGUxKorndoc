@@ -23,6 +23,7 @@ export interface Document {
   status: 'pending' | 'processing' | 'indexed' | 'error';
   error_message: string | null;
   uploaded_by: number;
+  uploaded_by_username: string | null;
   org_id: number | null;
   uploaded_at: string;
   updated_at: string;
@@ -30,7 +31,6 @@ export interface Document {
   page_count: number | null;
   chunk_count: number | null;
   tags: string[];
-  department: string | null;
 }
 
 export interface DocumentPermission {
@@ -47,7 +47,6 @@ export interface DocumentPermission {
 export interface SearchFilters {
   file_type?: string;
   folder_path?: string;
-  department?: string;
   org_id?: number;
   date_from?: string;
   date_to?: string;

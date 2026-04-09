@@ -24,15 +24,6 @@ const FILE_TYPE_OPTIONS = [
   { value: 'txt', content: 'TXT' },
 ];
 
-const DEPARTMENT_OPTIONS = [
-  { value: '', content: 'Все отделы' },
-  { value: 'hr', content: 'HR' },
-  { value: 'legal', content: 'Юридический' },
-  { value: 'it', content: 'IT' },
-  { value: 'finance', content: 'Финансы' },
-  { value: 'marketing', content: 'Маркетинг' },
-];
-
 const SearchPage: React.FC = () => {
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<SearchFilters>({});
@@ -112,17 +103,6 @@ const SearchPage: React.FC = () => {
             onUpdate={(v) => setFilters({ ...filters, file_type: v[0] || undefined })}
             options={FILE_TYPE_OPTIONS}
             width={130}
-          />
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 140 }}>
-          <Text variant="caption-2" color="secondary">Отдел</Text>
-          <Select
-            size="s"
-            value={filters.department ? [filters.department] : ['']}
-            onUpdate={(v) => setFilters({ ...filters, department: v[0] || undefined })}
-            options={DEPARTMENT_OPTIONS}
-            width={140}
           />
         </div>
 

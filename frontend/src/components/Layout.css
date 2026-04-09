@@ -1,3 +1,7 @@
+.gn-aside-header {
+  --gn-aside-header-item-expanded-radius: 6px;
+}
+
 .layout-loading {
   display: flex;
   align-items: center;
