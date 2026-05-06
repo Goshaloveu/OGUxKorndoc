@@ -12,6 +12,7 @@ import './index.css';
 import App from './App';
 import { ThemeContext } from './hooks/useTheme';
 import type { Theme, AppLang } from './hooks/useTheme';
+import { NotificationProvider } from './contexts/NotificationContext';
 
 const LANG_TO_GRAVITY: Record<AppLang, Lang> = {
   ru: Lang.Ru,
@@ -69,7 +70,9 @@ const Root: React.FC = () => {
           <ThemeContext.Provider value={ctx}>
             <ThemeProvider key={lang} theme={theme}>
               <ToasterProvider toaster={toaster}>
-                <App />
+                <NotificationProvider>
+                  <App />
+                </NotificationProvider>
                 <ToasterComponent />
               </ToasterProvider>
             </ThemeProvider>

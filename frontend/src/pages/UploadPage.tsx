@@ -1,28 +1,27 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Button, Text, TextInput, Label, Alert, Progress } from '@gravity-ui/uikit';
-import { uploadDocument, getDocumentStatus } from '../api/documents';
+import { uploadDocument } from '../api/documents';
 import type { UploadDocumentParams } from '../api/documents';
+import { useNotifications } from '../contexts/NotificationContext';
 
 interface UploadItem {
   localId: string;
   file: File;
   title: string;
-  status: 'waiting' | 'uploading' | 'pending' | 'processing' | 'indexed' | 'error';
+  status: 'waiting' | 'uploading' | 'pending' | 'error';
   progress: number;
-  documentId: number | null;
   errorMsg: string | null;
 }
 
 const STATUS_TEXT: Record<UploadItem['status'], string> = {
   waiting: '⏳ Ожидает',
   uploading: '⬆️ Загружается...',
-  pending: '🕐 В очереди',
-  processing: '⚙️ Обрабатывается...',
-  indexed: '✅ Индексирован',
-  error: '❌ Ошибка',
+  pending: '🕐 Отправлен на обработку',
+  error: '❌ Ошибка загрузки',
 };
 
 const UploadPage: React.FC = () => {
+  const { addNotification, registerPendingUpload } = useNotifications();
   const [queue, setQueue] = useState<UploadItem[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
@@ -31,42 +30,8 @@ const UploadPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queueRef = useRef<UploadItem[]>([]);
 
-  // Keep ref in sync with state for polling
-  useEffect(() => {
-    queueRef.current = queue;
-  }, [queue]);
-
-  // Poll every 2 seconds for pending/processing items
-  useEffect(() => {
-    const id = setInterval(async () => {
-      const current = queueRef.current;
-      const toPoll = current.filter(
-        (item) =>
-          (item.status === 'pending' || item.status === 'processing') &&
-          item.documentId !== null,
-      );
-      for (const item of toPoll) {
-        try {
-          const statusData = await getDocumentStatus(item.documentId!);
-          setQueue((prev) =>
-            prev.map((q) =>
-              q.localId === item.localId
-                ? {
-                    ...q,
-                    status: statusData.status as UploadItem['status'],
-                    errorMsg: statusData.error_message,
-                  }
-                : q,
-            ),
-          );
-        } catch {
-          // ignore polling errors silently
-        }
-      }
-    }, 2000);
-
-    return () => clearInterval(id);
-  }, []);
+  // Keep ref in sync with state
+  queueRef.current = queue;
 
   const addFiles = useCallback((files: File[]) => {
     const newItems: UploadItem[] = files.map((file) => ({
@@ -75,7 +40,6 @@ const UploadPage: React.FC = () => {
       title: file.name.replace(/\.[^.]+$/, ''),
       status: 'waiting' as const,
       progress: 0,
-      documentId: null,
       errorMsg: null,
     }));
     setQueue((prev) => [...prev, ...newItems]);
@@ -137,15 +101,37 @@ const UploadPage: React.FC = () => {
         };
 
         const doc = await uploadDocument(params);
+
+        // Register with global monitor — it will poll and fire the "indexed" notification
+        registerPendingUpload(doc.id, item.title || item.file.name);
+
+        // "Upload started" notification (not "indexed" — BackgroundTaskMonitor handles that)
+        addNotification(
+          'info',
+          'upload',
+          `Файл «${item.title || item.file.name}» отправлен на обработку`,
+        );
+
         setQueue((prev) =>
           prev.map((q) =>
             q.localId === item.localId
-              ? { ...q, status: 'pending' as const, documentId: doc.id, progress: 100 }
+              ? { ...q, status: 'pending' as const, progress: 100 }
               : q,
           ),
         );
       } catch (e: unknown) {
-        const message = e instanceof Error ? e.message : 'Ошибка загрузки';
+        const apiErr = e as { response?: { data?: { detail?: string } } };
+        const message =
+          apiErr.response?.data?.detail ??
+          (e instanceof Error ? e.message : 'Ошибка загрузки');
+
+        addNotification(
+          'error',
+          'upload',
+          `Ошибка загрузки «${item.title || item.file.name}»`,
+          message,
+        );
+
         setQueue((prev) =>
           prev.map((q) =>
             q.localId === item.localId
@@ -155,7 +141,7 @@ const UploadPage: React.FC = () => {
         );
       }
     }
-  }, [folderPath, tags]);
+  }, [folderPath, tags, addNotification, registerPendingUpload]);
 
   const removeFromQueue = useCallback((localId: string) => {
     setQueue((prev) => prev.filter((q) => q.localId !== localId));
@@ -260,12 +246,7 @@ const UploadPage: React.FC = () => {
           </Text>
           {tags.length > 0 && (
             <div
-              style={{
-                display: 'flex',
-                gap: '0.4rem',
-                flexWrap: 'wrap',
-                marginBottom: 8,
-              }}
+              style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: 8 }}
             >
               {tags.map((tag) => (
                 <Label key={tag} theme="info" type="close" onCloseClick={() => removeTag(tag)}>
@@ -332,10 +313,11 @@ const UploadPage: React.FC = () => {
                   gap: 8,
                 }}
               >
-                <div
-                  style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}
-                >
-                  <Text variant="body-2" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                  <Text
+                    variant="body-2"
+                    style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  >
                     {item.file.name}
                   </Text>
                   <Text variant="caption-2" color="secondary">
@@ -347,7 +329,7 @@ const UploadPage: React.FC = () => {
                   color={
                     item.status === 'error'
                       ? 'danger'
-                      : item.status === 'indexed'
+                      : item.status === 'pending'
                         ? 'positive'
                         : 'secondary'
                   }

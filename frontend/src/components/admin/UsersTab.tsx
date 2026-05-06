@@ -17,6 +17,7 @@ import type { TableActionConfig } from '@gravity-ui/uikit';
 import { Plus, Person, Pencil } from '@gravity-ui/icons';
 import { toaster } from '@gravity-ui/uikit/toaster-singleton';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNotifications } from '../../contexts/NotificationContext';
 import {
   getAdminUsers,
   createAdminUser,
@@ -59,6 +60,7 @@ const EnhancedTable = withTableActions(Table<AdminUser>);
 const UsersTab: React.FC = () => {
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuth();
+  const { addNotification } = useNotifications();
   const [page, setPage] = useState(1);
   const [searchValue, setSearchValue] = useState('');
 
@@ -94,8 +96,8 @@ const UsersTab: React.FC = () => {
 
   const createMutation = useMutation({
     mutationFn: (params: CreateUserParams) => createAdminUser(params),
-    onSuccess: () => {
-      toaster.add({ name: 'user-created', title: 'Пользователь создан', theme: 'success', autoHiding: 3000 });
+    onSuccess: (_data, params) => {
+      addNotification('success', 'admin', `Пользователь ${params.username} создан`);
       setCreateOpen(false);
       resetCreateForm();
       void queryClient.invalidateQueries({ queryKey: ['admin-users'] });

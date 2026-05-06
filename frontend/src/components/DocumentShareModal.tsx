@@ -13,6 +13,7 @@ import { TrashBin } from '@gravity-ui/icons';
 import { Icon } from '@gravity-ui/uikit';
 import { toaster } from '@gravity-ui/uikit/toaster-singleton';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNotifications } from '../contexts/NotificationContext';
 import {
   addDocumentPermission,
   getDocumentPermissions,
@@ -40,6 +41,7 @@ interface DocumentShareModalProps {
 
 const DocumentShareModal: React.FC<DocumentShareModalProps> = ({ docId, docTitle, onClose }) => {
   const queryClient = useQueryClient();
+  const { addNotification } = useNotifications();
   const [newUserId, setNewUserId] = useState<number | null>(null);
   const [newOrgId, setNewOrgId] = useState<number | null>(null);
   const [newLevel, setNewLevel] = useState<string[]>(['viewer']);
@@ -58,7 +60,12 @@ const DocumentShareModal: React.FC<DocumentShareModalProps> = ({ docId, docTitle
         level: newLevel[0] as DocumentPermission['level'],
       }),
     onSuccess: () => {
-      toaster.add({ name: 'perm-added', title: 'Доступ выдан', theme: 'success', autoHiding: 3000 });
+      const who = addTarget === 'user' ? `пользователю ID ${newUserId}` : `организации ID ${newOrgId}`;
+      addNotification(
+        'success',
+        'permission',
+        `Права ${newLevel[0]} выданы ${who} на «${docTitle}»`,
+      );
       setNewUserId(null);
       setNewOrgId(null);
       void queryClient.invalidateQueries({ queryKey: ['doc-permissions', docId] });
@@ -76,7 +83,7 @@ const DocumentShareModal: React.FC<DocumentShareModalProps> = ({ docId, docTitle
   const removeMutation = useMutation({
     mutationFn: (permId: number) => removeDocumentPermission(docId!, permId),
     onSuccess: () => {
-      toaster.add({ name: 'perm-removed', title: 'Доступ отозван', theme: 'success', autoHiding: 3000 });
+      addNotification('success', 'permission', `Права на «${docTitle}» отозваны`);
       void queryClient.invalidateQueries({ queryKey: ['doc-permissions', docId] });
     },
     onError: () => {

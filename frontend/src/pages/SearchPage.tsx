@@ -8,6 +8,7 @@ import {
   Text,
   Select,
 } from '@gravity-ui/uikit';
+import { toaster } from '@gravity-ui/uikit/toaster-singleton';
 import { DatePicker } from '@gravity-ui/date-components';
 import { dateTime } from '@gravity-ui/date-utils';
 import type { DateTime } from '@gravity-ui/date-utils';
@@ -38,6 +39,15 @@ const SearchPage: React.FC = () => {
       }),
     onSuccess: (data) => {
       setLastResponse(data);
+    },
+    onError: (err: { response?: { data?: { detail?: string } } }) => {
+      toaster.add({
+        name: 'search-error',
+        title: 'Ошибка поиска',
+        content: err.response?.data?.detail ?? 'Не удалось выполнить поиск',
+        theme: 'danger',
+        autoHiding: 4000,
+      });
     },
   });
 

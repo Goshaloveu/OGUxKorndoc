@@ -220,3 +220,13 @@ qdrant_data/
 minio_data/
 redis_data/
 
+# itervox
+.itervox/
+WORKFLOW.md
+
+# status checks
+status_checks/
+
+watch_agent.py
+TASKS.md
+
