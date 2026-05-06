@@ -1,4 +1,4 @@
-.gn-aside-header {
+:root {
   --gn-aside-header-item-expanded-radius: 6px;
 }
 
@@ -46,6 +46,7 @@
   gap: 4px;
   padding: 0 4px;
 }
+
 
 .layout-footer-user {
   display: flex;

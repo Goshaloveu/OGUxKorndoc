@@ -26,6 +26,7 @@ import {
 } from '@gravity-ui/icons';
 import { toaster } from '@gravity-ui/uikit/toaster-singleton';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNotifications } from '../../contexts/NotificationContext';
 import {
   getAdminDocuments,
   updateAdminDocument,
@@ -280,6 +281,7 @@ const EnhancedDocTable = withTableActions(Table<AdminDocument>);
 
 const DocumentsTab: React.FC = () => {
   const queryClient = useQueryClient();
+  const { addNotification } = useNotifications();
   const [page, setPage] = useState(1);
   const [searchValue, setSearchValue] = useState('');
   const [filterStatus, setFilterStatus] = useState<string[]>([]);
@@ -345,11 +347,11 @@ const DocumentsTab: React.FC = () => {
   const reindexMutation = useMutation({
     mutationFn: (id: number) => reindexDocument(id),
     onSuccess: () => {
-      toaster.add({ name: 'doc-reindex', title: 'Документ поставлен в очередь', theme: 'success', autoHiding: 3000 });
+      addNotification('info', 'admin', 'Переиндексация запущена');
       void queryClient.invalidateQueries({ queryKey: ['admin-documents'] });
     },
     onError: () => {
-      toaster.add({ name: 'doc-reindex-err', title: 'Ошибка переиндексации', theme: 'danger', autoHiding: 4000 });
+      addNotification('error', 'admin', 'Ошибка переиндексации');
     },
   });
 

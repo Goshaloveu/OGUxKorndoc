@@ -8,8 +8,8 @@ import {
   TextInput,
   Label,
 } from '@gravity-ui/uikit';
-import { toaster } from '@gravity-ui/uikit/toaster-singleton';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNotifications } from '../contexts/NotificationContext';
 import {
   changePassword,
   getProfile,
@@ -26,6 +26,7 @@ function formatDate(iso: string): string {
 
 const ProfilePage: React.FC = () => {
   const queryClient = useQueryClient();
+  const { addNotification } = useNotifications();
 
   const [editUsername, setEditUsername] = useState('');
   const [editEmail, setEditEmail] = useState('');
@@ -42,34 +43,36 @@ const ProfilePage: React.FC = () => {
   const updateMutation = useMutation({
     mutationFn: updateProfile,
     onSuccess: () => {
-      toaster.add({ name: 'profile-updated', title: 'Профиль обновлён', theme: 'success' });
+      addNotification('success', 'settings', 'Профиль обновлён');
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       queryClient.invalidateQueries({ queryKey: ['me'] });
       setIsEditing(false);
     },
     onError: (err: { response?: { data?: { detail?: string } } }) => {
-      toaster.add({
-        name: 'profile-error',
-        title: err.response?.data?.detail ?? 'Ошибка обновления',
-        theme: 'danger',
-      });
+      addNotification(
+        'error',
+        'settings',
+        'Ошибка обновления профиля',
+        err.response?.data?.detail,
+      );
     },
   });
 
   const passwordMutation = useMutation({
     mutationFn: changePassword,
     onSuccess: () => {
-      toaster.add({ name: 'pwd-changed', title: 'Пароль изменён', theme: 'success' });
+      addNotification('success', 'settings', 'Пароль успешно изменён');
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
     },
     onError: (err: { response?: { data?: { detail?: string } } }) => {
-      toaster.add({
-        name: 'pwd-error',
-        title: err.response?.data?.detail ?? 'Ошибка смены пароля',
-        theme: 'danger',
-      });
+      addNotification(
+        'error',
+        'settings',
+        'Ошибка смены пароля',
+        err.response?.data?.detail,
+      );
     },
   });
 
@@ -90,7 +93,7 @@ const ProfilePage: React.FC = () => {
 
   const handlePasswordChange = () => {
     if (newPassword !== confirmPassword) {
-      toaster.add({ name: 'pwd-mismatch', title: 'Пароли не совпадают', theme: 'danger' });
+      addNotification('error', 'settings', 'Пароли не совпадают', 'Введите одинаковый новый пароль в оба поля');
       return;
     }
     passwordMutation.mutate({ old_password: oldPassword, new_password: newPassword });

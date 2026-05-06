@@ -36,23 +36,11 @@ const STATUS_LABELS: Record<Document['status'], string> = {
   error: 'Ошибка',
 };
 
-const FILE_TYPE_ACCENTS: Record<string, { color: string; background: string }> = {
-  pdf: {
-    color: 'var(--g-color-base-danger-heavy)',
-    background: 'var(--g-color-base-danger-light)',
-  },
-  docx: {
-    color: 'var(--g-color-base-info-heavy)',
-    background: 'var(--g-color-base-info-light)',
-  },
-  xlsx: {
-    color: 'var(--g-color-base-positive-heavy)',
-    background: 'var(--g-color-base-positive-light)',
-  },
-  txt: {
-    color: 'var(--g-color-text-secondary)',
-    background: 'var(--g-color-base-generic)',
-  },
+const FILE_TYPE_COLORS: Record<string, string> = {
+  pdf: '#d93025',
+  docx: '#1a73e8',
+  xlsx: '#188038',
+  txt: '#80868b',
 };
 
 function formatDate(iso: string): string {
@@ -133,57 +121,53 @@ const DocumentGrid: React.FC<DocumentGridProps> = ({
           gap: '1rem',
         }}
       >
-        {items.map((doc) => {
-          const accent = FILE_TYPE_ACCENTS[doc.file_type] ?? {
-            color: 'var(--g-color-text-secondary)',
-            background: 'var(--g-color-base-generic)',
-          };
-
-          return (
-            <Card
-              key={doc.id}
-              type="action"
+        {items.map((doc) => (
+          <Card
+            key={doc.id}
+            type="action"
+            style={{
+              width: '100%',
+              minHeight: cardHeight,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              padding: size === 'large' ? '1.25rem 1rem 1rem' : '1rem 0.75rem 0.75rem',
+              gap: size === 'large' ? '0.5rem' : '0.35rem',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Top color stripe by file type */}
+            <div
               style={{
-                width: '100%',
-                minHeight: cardHeight,
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 4,
+                background: FILE_TYPE_COLORS[doc.file_type] ?? 'var(--g-color-base-generic-hover)',
+                borderRadius: '12px 12px 0 0',
+              }}
+            />
+
+            {/* File icon */}
+            <div
+              style={{
+                width: iconSize,
+                height: iconSize,
+                borderRadius: 10,
+                background: FILE_TYPE_COLORS[doc.file_type]
+                  ? `${FILE_TYPE_COLORS[doc.file_type]}18`
+                  : 'var(--g-color-base-generic)',
                 display: 'flex',
-                flexDirection: 'column',
                 alignItems: 'center',
-                padding: size === 'large' ? '1.25rem 1rem 1rem' : '1rem 0.75rem 0.75rem',
-                gap: size === 'large' ? '0.5rem' : '0.35rem',
-                position: 'relative',
-                overflow: 'hidden',
+                justifyContent: 'center',
+                color: FILE_TYPE_COLORS[doc.file_type] ?? 'var(--g-color-text-secondary)',
+                marginTop: size === 'large' ? 4 : 2,
               }}
             >
-              {/* Top color stripe by file type */}
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: 4,
-                  background: accent.color,
-                  borderRadius: '12px 12px 0 0',
-                }}
-              />
-
-              {/* File icon */}
-              <div
-                style={{
-                  width: iconSize,
-                  height: iconSize,
-                  borderRadius: 10,
-                  background: accent.background,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: accent.color,
-                  marginTop: size === 'large' ? 4 : 2,
-                }}
-              >
-                <FileText width={iconSize * 0.55} height={iconSize * 0.55} />
-              </div>
+              <FileText width={iconSize * 0.55} height={iconSize * 0.55} />
+            </div>
 
             {/* Title */}
             <div
@@ -253,9 +237,8 @@ const DocumentGrid: React.FC<DocumentGridProps> = ({
                 )}
               </>
             )}
-            </Card>
-          );
-        })}
+          </Card>
+        ))}
       </div>
 
       {/* Preview modal */}

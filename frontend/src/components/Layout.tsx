@@ -13,10 +13,13 @@ import {
   Moon,
   ArrowRightFromSquare,
   CircleQuestion,
+  FaceRobot,
+  House,
 } from '@gravity-ui/icons';
 import { useAuth } from '../hooks/useAuth';
 import { useThemeContext } from '../hooks/useTheme';
 import type { AppLang } from '../hooks/useTheme';
+import NotificationBell from './NotificationBell';
 import './Layout.css';
 
 const LANG_OPTIONS = [
@@ -57,11 +60,18 @@ const Layout: React.FC = () => {
 
   const menuItems = [
     {
+      id: 'home',
+      title: 'Главная',
+      icon: House,
+      current: isActive('/'),
+      onItemClick: () => navigate('/'),
+    },
+    {
       id: 'search',
       title: 'Поиск',
       icon: Magnifier,
-      current: isActive('/'),
-      onItemClick: () => navigate('/'),
+      current: isActive('/search'),
+      onItemClick: () => navigate('/search'),
     },
     {
       id: 'upload',
@@ -76,6 +86,13 @@ const Layout: React.FC = () => {
       icon: Folder,
       current: isActive('/documents'),
       onItemClick: () => navigate('/documents'),
+    },
+    {
+      id: 'ai',
+      title: 'AI Ассистент',
+      icon: FaceRobot,
+      current: isActive('/ai'),
+      onItemClick: () => navigate('/ai'),
     },
     {
       id: 'profile',
@@ -115,9 +132,9 @@ const Layout: React.FC = () => {
       onChangeCompact={handleCompact}
       headerDecoration
       menuItems={menuItems}
-      renderFooter={() => (
+      renderFooter={({ compact: isCompact }) => (
         <div className="layout-footer">
-          {!compact && user && (
+          {!isCompact && user && (
             <div className="layout-footer-user">
               <Text variant="caption-2" color="secondary">
                 {user.username}
@@ -131,18 +148,23 @@ const Layout: React.FC = () => {
             id="faq"
             title="FAQ"
             icon={CircleQuestion}
+            compact={isCompact}
+            current={isActive('/faq')}
             onItemClick={() => navigate('/faq')}
           />
           <FooterItem
             id="settings"
             title="Настройки"
             icon={Gear}
-            onItemClick={() => {}}
+            compact={isCompact}
+            current={isActive('/settings')}
+            onItemClick={() => navigate('/settings')}
           />
           <FooterItem
             id="logout"
             title="Выйти"
             icon={ArrowRightFromSquare}
+            compact={isCompact}
             onItemClick={logout}
           />
         </div>
@@ -151,6 +173,7 @@ const Layout: React.FC = () => {
         <div className="layout-main">
           <div className="layout-header">
             <div className="layout-header-right">
+              <NotificationBell />
               <SegmentedRadioGroup
                 size="m"
                 value={theme}

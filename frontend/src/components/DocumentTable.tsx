@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNotifications } from '../contexts/NotificationContext';
 import {
   Button,
   Dialog,
@@ -95,6 +96,7 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
   onSort,
 }) => {
   const queryClient = useQueryClient();
+  const { addNotification } = useNotifications();
   const [deleteTarget, setDeleteTarget] = useState<Document | null>(null);
   const [previewDoc, setPreviewDoc] = useState<Document | null>(null);
   const [shareDoc, setShareDoc] = useState<Document | null>(null);
@@ -127,12 +129,13 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
   const deleteMutation = useMutation({
     mutationFn: (id: number) => deleteDocument(id),
     onSuccess: () => {
-      toaster.add({ name: 'delete-ok', title: 'Документ удалён', theme: 'success', autoHiding: 3000 });
+      const title = deleteTarget?.title ?? 'Документ';
+      addNotification('success', 'document', `Документ «${title}» удалён`);
       setDeleteTarget(null);
       void queryClient.invalidateQueries({ queryKey: ['documents'] });
     },
     onError: () => {
-      toaster.add({ name: 'delete-err', title: 'Ошибка при удалении', theme: 'danger', autoHiding: 4000 });
+      addNotification('error', 'document', 'Ошибка при удалении документа');
     },
   });
 
@@ -141,12 +144,12 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
       await Promise.all(ids.map((id) => deleteDocument(id)));
     },
     onSuccess: () => {
-      toaster.add({ name: 'bulk-del-ok', title: `Удалено документов: ${selectedIds.length}`, theme: 'success', autoHiding: 3000 });
+      addNotification('success', 'document', `Удалено документов: ${selectedIds.length}`);
       setSelectedIds([]);
       void queryClient.invalidateQueries({ queryKey: ['documents'] });
     },
     onError: () => {
-      toaster.add({ name: 'bulk-del-err', title: 'Ошибка при массовом удалении', theme: 'danger', autoHiding: 4000 });
+      addNotification('error', 'document', 'Ошибка при массовом удалении');
     },
   });
 
