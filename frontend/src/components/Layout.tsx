@@ -131,7 +131,7 @@ const Layout: React.FC = () => {
             id="faq"
             title="FAQ"
             icon={CircleQuestion}
-            onItemClick={() => {}}
+            onItemClick={() => navigate('/faq')}
           />
           <FooterItem
             id="settings"

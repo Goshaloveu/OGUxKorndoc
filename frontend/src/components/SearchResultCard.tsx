@@ -16,10 +16,10 @@ const FILE_TYPE_LABELS: Record<string, string> = {
 };
 
 const FILE_TYPE_COLORS: Record<string, string> = {
-  pdf: '#e53e3e',
-  docx: '#3182ce',
-  xlsx: '#38a169',
-  txt: '#718096',
+  pdf: 'var(--g-color-base-danger-heavy)',
+  docx: 'var(--g-color-base-info-heavy)',
+  xlsx: 'var(--g-color-base-positive-heavy)',
+  txt: 'var(--g-color-text-secondary)',
 };
 
 const FILE_TYPE_BADGE_THEMES: Record<string, 'danger' | 'info' | 'success' | 'normal'> = {
@@ -45,7 +45,7 @@ const SearchResultCard: React.FC<SearchResultCardProps> = ({ result }) => {
   const [hovered, setHovered] = useState(false);
 
   const scorePercent = Math.round(result.score * 100);
-  const borderColor = FILE_TYPE_COLORS[result.file_type] ?? '#718096';
+  const borderColor = FILE_TYPE_COLORS[result.file_type] ?? 'var(--g-color-text-secondary)';
 
   const handlePreview = async () => {
     setPreviewOpen(true);

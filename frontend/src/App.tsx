@@ -8,6 +8,7 @@ import UploadPage from './pages/UploadPage';
 import DocumentsPage from './pages/DocumentsPage';
 import AdminPage from './pages/AdminPage';
 import ProfilePage from './pages/ProfilePage';
+import FAQPage from './pages/FAQPage';
 
 const App: React.FC = () => {
   return (
@@ -20,6 +21,7 @@ const App: React.FC = () => {
           <Route path="/documents" element={<DocumentsPage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/faq" element={<FAQPage />} />
         </Route>
       </Route>
     </Routes>
