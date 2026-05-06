@@ -1,5 +1,5 @@
 import React from 'react';
-import { Disclosure, Text, Card, Accordion } from '@gravity-ui/uikit';
+import { Accordion, Card, Text } from '@gravity-ui/uikit';
 
 interface FAQItem {
   question: string;
@@ -89,23 +89,15 @@ const FAQPage: React.FC = () => {
       </div>
 
       <Card view="outlined" style={{ overflow: 'hidden' }}>
-        {FAQ_ITEMS.map((item, idx) => (
-          <div
-            key={idx}
-            style={{
-              borderBottom:
-                idx < FAQ_ITEMS.length - 1 ? '1px solid var(--g-color-line-generic)' : 'none',
-            }}
-          >
-            <Disclosure summary={item.question} defaultExpanded={false}>
-              <div style={{ padding: '0 16px 16px' }}>
-                <Text variant="body-2" color="secondary">
-                  {item.answer}
-                </Text>
-              </div>
-            </Disclosure>
-          </div>
-        ))}
+        <Accordion view="top-bottom" size="l">
+          {FAQ_ITEMS.map((item) => (
+            <Accordion.Item key={item.question} value={item.question} summary={item.question}>
+              <Text variant="body-2" color="secondary">
+                {item.answer}
+              </Text>
+            </Accordion.Item>
+          ))}
+        </Accordion>
       </Card>
     </div>
   );
