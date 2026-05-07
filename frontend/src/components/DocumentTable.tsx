@@ -264,9 +264,6 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
           >
             {doc.title}
           </a>
-          {doc.filename !== doc.title && (
-            <Text variant="caption-2" color="hint">{doc.filename}</Text>
-          )}
         </div>
       ),
     },

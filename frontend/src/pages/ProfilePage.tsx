@@ -152,7 +152,7 @@ const ProfilePage: React.FC = () => {
           <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <Text variant="subheader-2">Редактирование профиля</Text>
             <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: 200 }}>
+              <div style={{ flex: 1, minWidth: 200, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <Text variant="caption-2" color="secondary">Имя пользователя</Text>
                 <TextInput
                   value={editUsername}
@@ -160,7 +160,7 @@ const ProfilePage: React.FC = () => {
                   placeholder="Имя пользователя"
                 />
               </div>
-              <div style={{ flex: 1, minWidth: 200 }}>
+              <div style={{ flex: 1, minWidth: 200, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <Text variant="caption-2" color="secondary">Email</Text>
                 <TextInput
                   value={editEmail}
@@ -192,7 +192,7 @@ const ProfilePage: React.FC = () => {
           Смена пароля
         </Text>
         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <div style={{ minWidth: 180 }}>
+          <div style={{ minWidth: 180, display: 'flex', flexDirection: 'column', gap: 6 }}>
             <Text variant="caption-2" color="secondary">Текущий пароль</Text>
             <TextInput
               type="password"
@@ -201,7 +201,7 @@ const ProfilePage: React.FC = () => {
               placeholder="Текущий пароль"
             />
           </div>
-          <div style={{ minWidth: 180 }}>
+          <div style={{ minWidth: 180, display: 'flex', flexDirection: 'column', gap: 6 }}>
             <Text variant="caption-2" color="secondary">Новый пароль</Text>
             <TextInput
               type="password"
@@ -210,7 +210,7 @@ const ProfilePage: React.FC = () => {
               placeholder="Новый пароль"
             />
           </div>
-          <div style={{ minWidth: 180 }}>
+          <div style={{ minWidth: 180, display: 'flex', flexDirection: 'column', gap: 6 }}>
             <Text variant="caption-2" color="secondary">Повторите пароль</Text>
             <TextInput
               type="password"

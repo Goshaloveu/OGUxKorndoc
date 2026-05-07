@@ -74,11 +74,18 @@ const SearchPage: React.FC = () => {
       <div style={{ display: 'flex', gap: '0.5rem' }}>
         <TextInput
           size="xl"
+          // view="clear"
+          type="search"
+          hasClear
           placeholder="Введите текст или отрывок из документа..."
           value={query}
           onUpdate={setQuery}
           onKeyDown={handleKeyDown}
-          startContent={<Magnifier width={20} height={20} />}
+          startContent={
+            <div style={{ marginLeft: 10, marginRight: 6, marginTop: 3 }}>
+              <Magnifier width={20} height={20} />
+            </div>
+          }
           style={{ flex: 1 }}
           disabled={mutation.isPending}
         />
@@ -108,7 +115,7 @@ const SearchPage: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 130 }}>
           <Text variant="caption-2" color="secondary">Тип файла</Text>
           <Select
-            size="s"
+            size="m"
             value={filters.file_type ? [filters.file_type] : ['']}
             onUpdate={(v) => setFilters({ ...filters, file_type: v[0] || undefined })}
             options={FILE_TYPE_OPTIONS}
@@ -119,7 +126,7 @@ const SearchPage: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 140 }}>
           <Text variant="caption-2" color="secondary">С даты</Text>
           <DatePicker
-            size="s"
+            size="m"
             format="DD.MM.YYYY"
             value={filters.date_from ? dateTime({ input: filters.date_from }) : null}
             onUpdate={(v: DateTime | null) =>
@@ -132,7 +139,7 @@ const SearchPage: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 140 }}>
           <Text variant="caption-2" color="secondary">По дату</Text>
           <DatePicker
-            size="s"
+            size="m"
             format="DD.MM.YYYY"
             value={filters.date_to ? dateTime({ input: filters.date_to }) : null}
             onUpdate={(v: DateTime | null) =>

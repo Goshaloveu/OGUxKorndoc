@@ -63,9 +63,6 @@ const SettingsPage: React.FC = () => {
         <Text variant="display-1" as="h1" style={{ marginBottom: '8px' }}>
           Настройки
         </Text>
-        <Text variant="body-2" color="secondary">
-          Параметры отображения и уведомлений
-        </Text>
       </div>
 
       {/* Display */}
@@ -76,9 +73,6 @@ const SettingsPage: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <Text variant="body-2">Тёмная тема</Text>
-            <Text variant="caption-1" color="secondary">
-              Использовать тёмное оформление интерфейса
-            </Text>
           </div>
           <Switch
             checked={localTheme === 'dark'}
@@ -92,10 +86,10 @@ const SettingsPage: React.FC = () => {
 
       {/* Notifications */}
       <Card view="outlined" style={{ padding: '20px' }}>
-        <Text variant="subheader-2" style={{ marginBottom: '4px' }}>
+        <Text variant="subheader-2" style={{ marginBottom: '8px' }}>
           Уведомления
         </Text>
-        <Text variant="body-2" color="secondary" style={{ marginBottom: '16px' }}>
+        <Text variant="body-2" color="secondary" style={{ marginBottom: '20px' }}>
           Категории событий, о которых вы хотите получать уведомления в колокольчике
         </Text>
 
@@ -105,7 +99,7 @@ const SettingsPage: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <Text variant="body-2">{CATEGORY_LABELS[cat]}</Text>
-                <Text variant="caption-1" color="secondary">
+                <Text variant="caption-1" color="secondary" style={{ display: 'block', marginTop: 2 }}>
                   {CATEGORY_DESCRIPTIONS[cat]}
                 </Text>
               </div>

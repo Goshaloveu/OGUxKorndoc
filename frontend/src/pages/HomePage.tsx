@@ -152,10 +152,10 @@ const HomePage: React.FC = () => {
 
       {/* Quick actions */}
       <div>
-        <Text variant="subheader-2" style={{ marginBottom: '12px' }}>
+        <Text variant="subheader-2">
           Быстрые действия
         </Text>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: 10 }}>
           <Button view="action" size="l" onClick={() => navigate('/search')}>
             <Icon data={Magnifier} size={16} />
             Найти документ
@@ -198,7 +198,7 @@ const HomePage: React.FC = () => {
                   key={doc.id}
                   style={{
                     display: 'flex',
-                    alignItems: 'center',
+                    alignItems: 'flex-start',
                     gap: '12px',
                     padding: '12px 16px',
                     borderBottom:
@@ -207,8 +207,8 @@ const HomePage: React.FC = () => {
                         : 'none',
                   }}
                 >
-                  <Icon data={FileText} size={16} style={{ color: 'var(--g-color-text-secondary)', flexShrink: 0 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                  <Icon data={FileText} size={16} style={{ color: 'var(--g-color-text-secondary)', flexShrink: 0, marginTop: 2 }} />
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <Text variant="body-2" ellipsis>
                       {doc.title}
                     </Text>
@@ -216,12 +216,14 @@ const HomePage: React.FC = () => {
                       {formatDate(doc.uploaded_at)} · {formatFileSize(doc.file_size)}
                     </Text>
                   </div>
-                  <Label theme={FILE_TYPE_THEMES[doc.file_type] ?? 'normal'} size="xs">
-                    {doc.file_type.toUpperCase()}
-                  </Label>
-                  <Label theme={STATUS_THEMES[doc.status]} size="xs">
-                    {STATUS_LABELS[doc.status]}
-                  </Label>
+                  <div style={{ display: 'flex', flexDirection: 'row', gap: 4, alignItems: 'flex-end', flexShrink: 0 }}>
+                    <Label theme={FILE_TYPE_THEMES[doc.file_type] ?? 'normal'} size="xs">
+                      {doc.file_type.toUpperCase()}
+                    </Label>
+                    <Label theme={STATUS_THEMES[doc.status]} size="xs">
+                      {STATUS_LABELS[doc.status]}
+                    </Label>
+                  </div>
                 </div>
               ))}
             </div>
