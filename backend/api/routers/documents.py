@@ -262,10 +262,7 @@ async def list_documents(
         uname_result = await db.execute(
             select(User.id, User.username).where(User.id.in_(uploader_ids))
         )
-        username_map = {
-            row["id"]: row["username"]
-            for row in uname_result.mappings().all()
-        }
+        username_map = {row["id"]: row["username"] for row in uname_result.mappings().all()}
 
     items = [
         DocumentOut.model_validate(d).model_copy(
