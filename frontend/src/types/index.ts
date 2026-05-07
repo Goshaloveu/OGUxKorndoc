@@ -8,6 +8,12 @@ export interface User {
   last_login?: string | null;
 }
 
+export interface UserLookup {
+  id: number;
+  email: string;
+  username: string;
+}
+
 export interface ApiError {
   detail: string;
 }

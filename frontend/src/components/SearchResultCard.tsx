@@ -3,6 +3,8 @@ import { Button, Label, Text, Modal } from '@gravity-ui/uikit';
 import { FileText, FileArrowDown } from '@gravity-ui/icons';
 import { getPresignedUrl } from '../api/documents';
 import type { SearchResult } from '../types';
+import { useTranslation } from '../i18n';
+import { useThemeContext } from '../hooks/useTheme';
 
 interface SearchResultCardProps {
   result: SearchResult;
@@ -16,10 +18,10 @@ const FILE_TYPE_LABELS: Record<string, string> = {
 };
 
 const FILE_TYPE_COLORS: Record<string, string> = {
-  pdf: '#e53e3e',
-  docx: '#3182ce',
-  xlsx: '#38a169',
-  txt: '#718096',
+  pdf: 'var(--g-color-line-danger)',
+  docx: 'var(--g-color-line-info)',
+  xlsx: 'var(--g-color-line-positive)',
+  txt: 'var(--g-color-line-generic-accent)',
 };
 
 const FILE_TYPE_BADGE_THEMES: Record<string, 'danger' | 'info' | 'success' | 'normal'> = {
@@ -29,8 +31,8 @@ const FILE_TYPE_BADGE_THEMES: Record<string, 'danger' | 'info' | 'success' | 'no
   txt: 'normal',
 };
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('ru-RU', {
+function formatDate(iso: string, lang: string): string {
+  return new Date(iso).toLocaleDateString(lang === 'en' ? 'en-US' : 'ru-RU', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -38,6 +40,9 @@ function formatDate(iso: string): string {
 }
 
 const SearchResultCard: React.FC<SearchResultCardProps> = ({ result }) => {
+  const { lang } = useThemeContext();
+  const tApp = useTranslation('app');
+  const tSearch = useTranslation('searchResult');
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewText, setPreviewText] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -45,7 +50,7 @@ const SearchResultCard: React.FC<SearchResultCardProps> = ({ result }) => {
   const [hovered, setHovered] = useState(false);
 
   const scorePercent = Math.round(result.score * 100);
-  const borderColor = FILE_TYPE_COLORS[result.file_type] ?? '#718096';
+  const borderColor = FILE_TYPE_COLORS[result.file_type] ?? 'var(--g-color-line-generic-accent)';
 
   const handlePreview = async () => {
     setPreviewOpen(true);
@@ -75,10 +80,10 @@ const SearchResultCard: React.FC<SearchResultCardProps> = ({ result }) => {
         const data = (await resp.json()) as { text: string; page_count: number };
         setPreviewText(data.text);
       } else {
-        setPreviewText('Не удалось загрузить превью');
+        setPreviewText(tSearch('previewLoadError'));
       }
     } catch {
-      setPreviewText('Ошибка загрузки превью');
+      setPreviewText(tSearch('previewError'));
     } finally {
       setPreviewLoading(false);
     }
@@ -135,7 +140,7 @@ const SearchResultCard: React.FC<SearchResultCardProps> = ({ result }) => {
 
         {/* Meta row */}
         <Text variant="caption-2" color="secondary">
-          {result.folder_path} · {formatDate(result.uploaded_at)}
+          {result.folder_path} · {formatDate(result.uploaded_at, lang)}
         </Text>
 
         {/* Snippet */}
@@ -146,11 +151,11 @@ const SearchResultCard: React.FC<SearchResultCardProps> = ({ result }) => {
         {/* Action buttons */}
         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
           <Button view="outlined" size="s" onClick={handlePreview}>
-            Превью
+            {tSearch('preview')}
           </Button>
           <Button view="outlined" size="s" onClick={handleDownload}>
             <FileArrowDown width={14} height={14} />
-            Скачать
+            {tSearch('download')}
           </Button>
         </div>
       </div>
@@ -162,7 +167,7 @@ const SearchResultCard: React.FC<SearchResultCardProps> = ({ result }) => {
           <div style={{ flex: 1, overflow: 'hidden' }}>
             {result.file_type === 'pdf' ? (
               previewLoading ? (
-                <Text color="secondary">Загрузка PDF...</Text>
+                <Text color="secondary">{tSearch('pdfLoading')}</Text>
               ) : pdfPresignedUrl ? (
                 <iframe
                   src={pdfPresignedUrl}
@@ -170,10 +175,10 @@ const SearchResultCard: React.FC<SearchResultCardProps> = ({ result }) => {
                   style={{ width: '100%', height: '100%', border: 'none' }}
                 />
               ) : (
-                <Text color="secondary">Не удалось загрузить PDF</Text>
+                <Text color="secondary">{tSearch('pdfLoadError')}</Text>
               )
             ) : previewLoading ? (
-              <Text color="secondary">Загрузка...</Text>
+              <Text color="secondary">{tApp('loading')}</Text>
             ) : (
               <div style={{ overflow: 'auto', height: '100%', whiteSpace: 'pre-wrap' }}>
                 <Text variant="body-1">{previewText ?? ''}</Text>
@@ -182,7 +187,7 @@ const SearchResultCard: React.FC<SearchResultCardProps> = ({ result }) => {
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <Button view="normal" onClick={() => setPreviewOpen(false)}>
-              Закрыть
+              {tApp('close')}
             </Button>
           </div>
         </div>

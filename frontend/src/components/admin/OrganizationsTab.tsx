@@ -30,7 +30,7 @@ import {
 } from '../../api/organizations';
 import type { OrganizationDetail, OrganizationMember } from '../../api/organizations';
 import { UserLookupSelect } from '../LookupSelects';
-import type { UserLookup } from '../../api/users';
+import type { UserLookup } from '../../types';
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('ru-RU', {
@@ -480,7 +480,7 @@ const OrganizationsTab: React.FC = () => {
                         Пользователь
                       </Text>
                       <div style={{ width: 300 }}>
-                        <UserLookupSelect value={addUser} onUpdate={setAddUser} />
+                        <UserLookupSelect value={addUser} onUpdate={setAddUser} placeholder="Найти пользователя"/>
                       </div>
                     </div>
                     <div>

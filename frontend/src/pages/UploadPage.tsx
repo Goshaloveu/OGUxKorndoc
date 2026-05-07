@@ -3,6 +3,7 @@ import { Button, Text, TextInput, Label, Alert, Progress } from '@gravity-ui/uik
 import { uploadDocument } from '../api/documents';
 import type { UploadDocumentParams } from '../api/documents';
 import { useNotifications } from '../contexts/NotificationContext';
+import { useTranslation } from '../i18n';
 
 interface UploadItem {
   localId: string;
@@ -13,15 +14,10 @@ interface UploadItem {
   errorMsg: string | null;
 }
 
-const STATUS_TEXT: Record<UploadItem['status'], string> = {
-  waiting: '⏳ Ожидает',
-  uploading: '⬆️ Загружается...',
-  pending: '🕐 Отправлен на обработку',
-  error: '❌ Ошибка загрузки',
-};
-
 const UploadPage: React.FC = () => {
   const { addNotification, registerPendingUpload } = useNotifications();
+  const t = useTranslation('uploadPage');
+  const tApp = useTranslation('app');
   const [queue, setQueue] = useState<UploadItem[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
@@ -109,7 +105,7 @@ const UploadPage: React.FC = () => {
         addNotification(
           'info',
           'upload',
-          `Файл «${item.title || item.file.name}» отправлен на обработку`,
+          t('sentNotification', { name: item.title || item.file.name }),
         );
 
         setQueue((prev) =>
@@ -123,12 +119,12 @@ const UploadPage: React.FC = () => {
         const apiErr = e as { response?: { data?: { detail?: string } } };
         const message =
           apiErr.response?.data?.detail ??
-          (e instanceof Error ? e.message : 'Ошибка загрузки');
+          (e instanceof Error ? e.message : t('statusError'));
 
         addNotification(
           'error',
           'upload',
-          `Ошибка загрузки «${item.title || item.file.name}»`,
+          t('uploadErrorNotification', { name: item.title || item.file.name }),
           message,
         );
 
@@ -141,13 +137,19 @@ const UploadPage: React.FC = () => {
         );
       }
     }
-  }, [folderPath, tags, addNotification, registerPendingUpload]);
+  }, [folderPath, tags, addNotification, registerPendingUpload, t]);
 
   const removeFromQueue = useCallback((localId: string) => {
     setQueue((prev) => prev.filter((q) => q.localId !== localId));
   }, []);
 
   const waitingCount = queue.filter((q) => q.status === 'waiting').length;
+  const statusText: Record<UploadItem['status'], string> = {
+    waiting: t('statusWaiting'),
+    uploading: t('statusUploading'),
+    pending: t('statusPending'),
+    error: t('statusError'),
+  };
 
   return (
     <div
@@ -159,7 +161,7 @@ const UploadPage: React.FC = () => {
         gap: '1.5rem',
       }}
     >
-      <Text variant="header-1">Загрузить документы</Text>
+      <Text variant="header-1">{t('title')}</Text>
 
       {/* Drag & Drop Zone */}
       <div
@@ -205,14 +207,14 @@ const UploadPage: React.FC = () => {
         </div>
         <div>
           <Text variant="body-2" style={{ fontWeight: 600, display: 'block' }}>
-            {isDragOver ? 'Отпустите файлы здесь' : 'Перетащите файлы сюда'}
+            {isDragOver ? t('dropHere') : t('dragHere')}
           </Text>
           <Text variant="caption-2" color="secondary" style={{ display: 'block', marginTop: 4 }}>
-            или нажмите для выбора
+            {t('clickToSelect')}
           </Text>
         </div>
         <Text variant="caption-2" color="hint">
-          PDF, DOCX, XLSX, TXT · не более 50 МБ
+          {t('limits')}
         </Text>
         <input
           ref={fileInputRef}
@@ -229,12 +231,12 @@ const UploadPage: React.FC = () => {
         <div style={{ display: 'flex', gap: '1rem' }}>
           <div style={{ flex: 1 }}>
             <Text variant="body-2" style={{ marginBottom: 4, display: 'block' }}>
-              Папка
+              {t('folder')}
             </Text>
             <TextInput
               value={folderPath}
               onUpdate={setFolderPath}
-              placeholder="/папка/подпапка/"
+              placeholder={t('folderPlaceholder')}
             />
           </div>
         </div>
@@ -242,7 +244,7 @@ const UploadPage: React.FC = () => {
         {/* Tags */}
         <div>
           <Text variant="body-2" style={{ marginBottom: 4, display: 'block' }}>
-            Теги
+            {t('tags')}
           </Text>
           {tags.length > 0 && (
             <div
@@ -259,7 +261,7 @@ const UploadPage: React.FC = () => {
             <TextInput
               value={tagInput}
               onUpdate={setTagInput}
-              placeholder="Добавить тег и нажать Enter..."
+              placeholder={t('tagPlaceholder')}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
@@ -269,7 +271,7 @@ const UploadPage: React.FC = () => {
               style={{ flex: 1 }}
             />
             <Button view="outlined" onClick={addTag} disabled={!tagInput.trim()}>
-              + Тег
+              {t('addTag')}
             </Button>
           </div>
         </div>
@@ -285,10 +287,10 @@ const UploadPage: React.FC = () => {
               alignItems: 'center',
             }}
           >
-            <Text variant="subheader-2">Очередь загрузки ({queue.length})</Text>
+            <Text variant="subheader-2">{t('queue', { count: queue.length })}</Text>
             {waitingCount > 0 && (
               <Button view="action" size="xl" onClick={uploadAll}>
-                Загрузить все ({waitingCount})
+                {t('uploadAll', { count: waitingCount })}
               </Button>
             )}
           </div>
@@ -321,7 +323,7 @@ const UploadPage: React.FC = () => {
                     {item.file.name}
                   </Text>
                   <Text variant="caption-2" color="secondary">
-                    {(item.file.size / 1024 / 1024).toFixed(2)} МБ
+                    {tApp('fileSize.mb', { value: (item.file.size / 1024 / 1024).toFixed(2) })}
                   </Text>
                 </div>
                 <Text
@@ -334,7 +336,7 @@ const UploadPage: React.FC = () => {
                         : 'secondary'
                   }
                 >
-                  {STATUS_TEXT[item.status]}
+                  {statusText[item.status]}
                 </Text>
                 {(item.status === 'waiting' || item.status === 'error') && (
                   <Button

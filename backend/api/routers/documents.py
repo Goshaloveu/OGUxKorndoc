@@ -11,7 +11,14 @@ from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict
 from shared.database import get_db
 from shared.minio_client import delete_file, download_file, generate_presigned_url, upload_file
-from shared.models import AuditLog, Document, DocumentPermission, OrganizationMember, User
+from shared.models import (
+    AuditLog,
+    Document,
+    DocumentPermission,
+    Organization,
+    OrganizationMember,
+    User,
+)
 from shared.security import get_current_user
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -463,7 +470,10 @@ async def list_permissions(
     await check_document_access(document_id, "owner", current_user, db)
 
     result = await db.execute(
-        select(DocumentPermission).where(DocumentPermission.document_id == document_id)
+        select(DocumentPermission, User.username, User.email, Organization.name)
+        .outerjoin(User, User.id == DocumentPermission.user_id)
+        .outerjoin(Organization, Organization.id == DocumentPermission.org_id)
+        .where(DocumentPermission.document_id == document_id)
     )
     perms = result.scalars().all()
     return await _build_permission_out_list(perms, db)
@@ -486,16 +496,15 @@ async def add_permission(
     if (body.user_id is None) == (body.org_id is None):
         raise HTTPException(status_code=400, detail="Укажите ровно одно из: user_id или org_id")
 
+    target_user: User | None = None
+    target_org: Organization | None = None
     if body.user_id is not None:
-        user = await db.get(User, body.user_id)
-        if user is None or not user.is_active:
-            raise HTTPException(status_code=404, detail="Активный пользователь не найден")
-
+        target_user = await db.get(User, body.user_id)
+        if target_user is None or not target_user.is_active:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
     if body.org_id is not None:
-        from shared.models import Organization
-
-        org = await db.get(Organization, body.org_id)
-        if org is None:
+        target_org = await db.get(Organization, body.org_id)
+        if target_org is None:
             raise HTTPException(status_code=404, detail="Организация не найдена")
 
     perm = DocumentPermission(

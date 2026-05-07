@@ -3,6 +3,7 @@ import { Alert, Modal, Skeleton, Text } from '@gravity-ui/uikit';
 import { useQuery } from '@tanstack/react-query';
 import { getDocumentPreview, getPresignedUrl } from '../api/documents';
 import type { Document } from '../types';
+import { useTranslation } from '../i18n';
 
 interface DocumentPreviewModalProps {
   doc: Document | null;
@@ -10,6 +11,7 @@ interface DocumentPreviewModalProps {
 }
 
 const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({ doc, onClose }) => {
+  const t = useTranslation('searchResult');
   const isPdf = doc?.file_type === 'pdf';
 
   const { data: previewUrl, isLoading: urlLoading } = useQuery({
@@ -43,7 +45,7 @@ const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({ doc, onClos
         {isLoading && <Skeleton style={{ flex: 1 }} />}
 
         {isError && (
-          <Alert theme="danger" message="Не удалось загрузить превью документа" />
+          <Alert theme="danger" message={t('documentPreviewLoadError')} />
         )}
 
         {!isLoading && !isError && isPdf && previewUrl && (
@@ -69,7 +71,7 @@ const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({ doc, onClos
               wordBreak: 'break-word',
             }}
           >
-            {preview.text || <Text color="hint">Текст документа недоступен</Text>}
+            {preview.text || <Text color="hint">{t('textUnavailable')}</Text>}
           </div>
         )}
       </div>

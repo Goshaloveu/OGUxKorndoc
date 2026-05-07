@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict
 from shared.database import get_db
 from shared.models import User
 from shared.security import get_current_user
-from sqlalchemy import or_, select
+from sqlalchemy import case, or_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api/users", tags=["users"])
@@ -33,21 +33,18 @@ async def lookup_users(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Lookup active users by partial email or username match."""
-    del current_user
-
-    query = q.strip()
+    """Lookup active users by exact email or username prefix."""
+    query = q.strip().lower()
     if not query:
         return []
 
-    pattern = f"%{query}%"
+    email_match = func.lower(User.email) == query
+    username_match = func.lower(User.username).like(f"{query}%")
+
     result = await db.execute(
         select(User)
-        .where(
-            User.is_active.is_(True),
-            or_(User.email.ilike(pattern), User.username.ilike(pattern)),
-        )
-        .order_by(User.username, User.email)
-        .limit(LOOKUP_LIMIT)
+        .where(User.is_active.is_(True), email_match | username_match)
+        .order_by(case((email_match, 0), else_=1), User.username)
+        .limit(10)
     )
     return [UserLookupOut.model_validate(user) for user in result.scalars().all()]

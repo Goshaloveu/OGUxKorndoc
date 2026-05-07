@@ -16,19 +16,15 @@ import { getProfile } from '../api/profile';
 import { getDocuments } from '../api/documents';
 import { useAuth } from '../hooks/useAuth';
 import type { Document } from '../types';
+import { useTranslation } from '../i18n';
+import { useThemeContext } from '../hooks/useTheme';
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('ru-RU', {
+function formatDate(iso: string, lang: string): string {
+  return new Date(iso).toLocaleDateString(lang === 'en' ? 'en-US' : 'ru-RU', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
   });
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} Б`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} КБ`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} МБ`;
 }
 
 const FILE_TYPE_THEMES: Record<string, 'info' | 'success' | 'warning' | 'danger' | 'normal'> = {
@@ -36,13 +32,6 @@ const FILE_TYPE_THEMES: Record<string, 'info' | 'success' | 'warning' | 'danger'
   docx: 'info',
   xlsx: 'success',
   txt: 'normal',
-};
-
-const STATUS_LABELS: Record<Document['status'], string> = {
-  pending: 'В очереди',
-  processing: 'Обработка',
-  indexed: 'Индексирован',
-  error: 'Ошибка',
 };
 
 const STATUS_THEMES: Record<Document['status'], 'info' | 'success' | 'warning' | 'danger' | 'normal'> = {
@@ -55,6 +44,9 @@ const STATUS_THEMES: Record<Document['status'], 'info' | 'success' | 'warning' |
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { lang } = useThemeContext();
+  const t = useTranslation('home');
+  const tApp = useTranslation('app');
   const isAdmin = user?.role === 'admin';
 
   const { data: profile, isLoading: profileLoading } = useQuery({
@@ -73,11 +65,24 @@ const HomePage: React.FC = () => {
     queryFn: () => getDocuments({ page: 1, limit: 5 }),
   });
 
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return tApp('fileSize.bytes', { value: bytes });
+    if (bytes < 1024 * 1024) return tApp('fileSize.kb', { value: (bytes / 1024).toFixed(1) });
+    return tApp('fileSize.mb', { value: (bytes / 1024 / 1024).toFixed(1) });
+  };
+
+  const statusLabels: Record<Document['status'], string> = {
+    pending: tApp('pending'),
+    processing: tApp('processing'),
+    indexed: tApp('indexed'),
+    error: tApp('error'),
+  };
+
   const greeting = (): string => {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Доброе утро';
-    if (hour < 17) return 'Добрый день';
-    return 'Добрый вечер';
+    if (hour < 12) return t('morning');
+    if (hour < 17) return t('day');
+    return t('evening');
   };
 
   return (
@@ -91,27 +96,24 @@ const HomePage: React.FC = () => {
               {profileLoading ? (
                 <Skeleton style={{ display: 'inline-block', width: 120, height: 28 }} />
               ) : (
-                profile?.user.username ?? user?.username ?? 'пользователь'
+                profile?.user.username ?? user?.username ?? t('fallbackUser')
               )}
               !
             </Text>
             <Text variant="body-2" color="secondary">
-              Добро пожаловать в систему управления документами KornDoc
+              {t('welcome')}
             </Text>
           </div>
-          <Label theme="info" size="m">
-            {user?.role === 'admin' ? 'Администратор' : 'Пользователь'}
-          </Label>
         </div>
       </Card>
 
       {/* Stats row (admin only) */}
       {isAdmin && (
         <div>
-          <Text variant="subheader-2" style={{ marginBottom: '12px' }}>
-            Статистика системы
+          <Text variant="subheader-2">
+            {t('systemStats')}
           </Text>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', flexWrap: 'wrap', marginTop: 16 }}>
             {statsLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <Card key={i} view="outlined" style={{ padding: '16px' }}>
@@ -123,25 +125,25 @@ const HomePage: React.FC = () => {
                 <StatCard
                   icon={<Icon data={FileText} size={20} />}
                   value={String(stats.total_docs)}
-                  label="Всего документов"
+                  label={t('totalDocuments')}
                   color="var(--g-color-text-info)"
                 />
                 <StatCard
                   icon={<Icon data={CircleCheck} size={20} />}
                   value={String(stats.indexed_docs)}
-                  label="Индексировано"
+                  label={t('indexed')}
                   color="var(--g-color-text-positive)"
                 />
                 <StatCard
                   icon={<Icon data={Magnifier} size={20} />}
                   value={String(stats.searches_today)}
-                  label="Поисков сегодня"
+                  label={t('searchesToday')}
                   color="var(--g-color-text-warning)"
                 />
                 <StatCard
                   icon={<Icon data={Folder} size={20} />}
                   value={String(stats.total_users)}
-                  label="Пользователей"
+                  label={t('users')}
                   color="var(--g-color-text-misc)"
                 />
               </>
@@ -153,30 +155,30 @@ const HomePage: React.FC = () => {
       {/* Quick actions */}
       <div>
         <Text variant="subheader-2">
-          Быстрые действия
+          {t('quickActions')}
         </Text>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: 10 }}>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: 16 }}>
           <Button view="action" size="l" onClick={() => navigate('/search')}>
             <Icon data={Magnifier} size={16} />
-            Найти документ
+            {t('findDocument')}
           </Button>
           <Button view="normal" size="l" onClick={() => navigate('/upload')}>
             <Icon data={ArrowUpFromLine} size={16} />
-            Загрузить файл
+            {t('uploadFile')}
           </Button>
           <Button view="outlined" size="l" onClick={() => navigate('/ai')}>
             <Icon data={FaceRobot} size={16} />
-            AI Ассистент
+            {tApp('aiAssistant')}
           </Button>
         </div>
       </div>
 
       {/* Recent documents */}
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-          <Text variant="subheader-2">Недавние документы</Text>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <Text variant="subheader-2">{t('recentDocuments')}</Text>
           <Button view="flat" size="s" onClick={() => navigate('/documents')}>
-            Все документы →
+            {t('allDocuments')}
           </Button>
         </div>
 
@@ -189,7 +191,7 @@ const HomePage: React.FC = () => {
             </div>
           ) : !recentDocs?.items.length ? (
             <div style={{ padding: '32px', textAlign: 'center' }}>
-              <Text color="secondary">Документы не найдены. Загрузите первый!</Text>
+              <Text color="secondary">{t('emptyDocuments')}</Text>
             </div>
           ) : (
             <div>
@@ -213,7 +215,7 @@ const HomePage: React.FC = () => {
                       {doc.title}
                     </Text>
                     <Text variant="caption-1" color="secondary">
-                      {formatDate(doc.uploaded_at)} · {formatFileSize(doc.file_size)}
+                      {formatDate(doc.uploaded_at, lang)} · {formatFileSize(doc.file_size)}
                     </Text>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'row', gap: 4, alignItems: 'flex-end', flexShrink: 0 }}>
@@ -221,7 +223,7 @@ const HomePage: React.FC = () => {
                       {doc.file_type.toUpperCase()}
                     </Label>
                     <Label theme={STATUS_THEMES[doc.status]} size="xs">
-                      {STATUS_LABELS[doc.status]}
+                      {statusLabels[doc.status]}
                     </Label>
                   </div>
                 </div>

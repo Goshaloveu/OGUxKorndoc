@@ -20,8 +20,7 @@ import {
 } from '../api/documents';
 import { OrganizationLookupSelect, UserLookupSelect } from './LookupSelects';
 import type { OrganizationLookup } from '../api/organizations';
-import type { UserLookup } from '../api/users';
-import type { DocumentPermission } from '../types';
+import type { DocumentPermission, UserLookup } from '../types';
 
 const LEVEL_OPTIONS = [
   { value: 'viewer', content: 'Читатель (viewer)' },
@@ -188,7 +187,7 @@ const DocumentShareModal: React.FC<DocumentShareModalProps> = ({ docId, docTitle
               />
               {addTarget === 'user' ? (
                 <div style={{ minWidth: 260, flex: 1 }}>
-                  <UserLookupSelect value={newUser} onUpdate={setNewUser} />
+                  <UserLookupSelect value={newUser} onUpdate={setNewUser} placeholder="Найти пользователя" />
                 </div>
               ) : (
                 <div style={{ minWidth: 260, flex: 1 }}>
