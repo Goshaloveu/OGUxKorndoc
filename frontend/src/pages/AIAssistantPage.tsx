@@ -10,9 +10,7 @@ const SYSTEM_PROMPT =
   'Answer questions about documents, help users find information, and assist with document-related tasks. ' +
   'Respond in Russian by default.';
 
-const DEEPSEEK_API_KEY = 'sk-78992e83603d4832b4b9242657e93c98';
-const DEEPSEEK_URL = 'https://api.deepseek.com/v1/chat/completions';
-const MODEL = 'deepseek-chat';
+const CHAT_URL = '/api/chat/completions';
 
 function genId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -63,14 +61,14 @@ const AIAssistantPage: React.FC = () => {
     abortRef.current = controller;
 
     try {
-      const response = await fetch(DEEPSEEK_URL, {
+      const token = localStorage.getItem('access_token') ?? '';
+      const response = await fetch(CHAT_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          model: MODEL,
           messages: historyForApi,
           stream: true,
         }),

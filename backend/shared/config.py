@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     chunk_size: int = 2048
     chunk_overlap: int = 256
 
+    # LLM proxy (OpenAI-compatible). Switch provider by changing only these 3 vars.
+    llm_provider: str = "deepseek"
+    llm_api_key: str = ""
+    llm_base_url: str = "https://api.deepseek.com/v1"
+    llm_model: str = "deepseek-chat"
+
     # App
     environment: str = "development"
     log_level: str = "INFO"
