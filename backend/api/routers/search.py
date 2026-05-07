@@ -177,6 +177,15 @@ def _build_qdrant_filter(
     return Filter(must=must_conditions) if must_conditions else None
 
 
+def _to_qdrant_sparse_vector(sparse_embedding):
+    from qdrant_client.http.models import SparseVector
+
+    return SparseVector(
+        indices=sparse_embedding.indices.tolist(),
+        values=sparse_embedding.values.tolist(),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -205,6 +214,8 @@ async def search(
     # 2. Embed query
     embedder = request.app.state.embedder
     vector: list[float] = embedder.encode([query.query])[0].tolist()
+    sparse_embedder = request.app.state.sparse_embedder
+    sparse_vector = _to_qdrant_sparse_vector(next(sparse_embedder.embed([query.query])))
 
     # 3. Build Qdrant filter
     user_org_ids: list[int] = []
@@ -216,8 +227,9 @@ async def search(
         current_user, user_org_ids, permitted_doc_ids, query.filters
     )
 
-    # 4. Qdrant search (over-fetch for dedup)
+    # 4. Qdrant hybrid search (dense + sparse prefetch, RRF fusion; over-fetch for dedup)
     from qdrant_client import QdrantClient
+    from qdrant_client.http.models import Fusion, FusionQuery, Prefetch
 
     qdrant = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
     search_limit = query.limit * 3
@@ -225,7 +237,11 @@ async def search(
     try:
         response = qdrant.query_points(
             collection_name=settings.qdrant_collection,
-            query=vector,
+            prefetch=[
+                Prefetch(query=vector, using="dense", limit=search_limit),
+                Prefetch(query=sparse_vector, using="sparse", limit=search_limit),
+            ],
+            query=FusionQuery(fusion=Fusion.RRF),
             query_filter=qdrant_filter,
             limit=search_limit,
             with_payload=True,

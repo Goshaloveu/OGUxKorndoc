@@ -125,6 +125,7 @@ docker-compose restart worker
 |-----------|---------|
 | `SECRET_KEY` | JWT секрет (минимум 32 символа, обязательно сменить в prod) |
 | `EMBEDDING_MODEL` | Название HuggingFace модели (default: `paraphrase-multilingual-mpnet-base-v2`) |
+| `SPARSE_EMBEDDING_MODEL` | Sparse-модель FastEmbed для BM25 (default: `Qdrant/bm25`) |
 | `EMBEDDING_DIM` | Размер вектора (default: 768) |
 | `CHUNK_SIZE` | Размер чанка в символах (default: 2048) |
 | `MINIO_ENDPOINT` | Адрес MinIO — для облака менять здесь |
@@ -132,8 +133,8 @@ docker-compose restart worker
 ### Смена embedding-модели
 
 1. Поменяй `EMBEDDING_MODEL` и `EMBEDDING_DIM` в `.env`
-2. Удали Qdrant-коллекцию: `docker-compose exec api python -c "from qdrant_client import QdrantClient; QdrantClient(host='qdrant').delete_collection('documents')"`
-3. Перезапусти сервисы и переиндексируй документы через AdminPage → Reindex
+2. Перезапусти сервисы и запусти полную переиндексацию:
+   `docker-compose exec worker celery -A celery_app call worker.tasks.process_document.reindex_all_documents`
 
 ## Архитектура
 

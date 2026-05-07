@@ -36,6 +36,7 @@ class Settings(BaseSettings):
 
     # Embedding
     embedding_model: str = "google/embeddinggemma-300m"
+    sparse_embedding_model: str = "Qdrant/bm25"
     embedding_dim: int = 768
     chunk_size: int = 2048
     chunk_overlap: int = 256
