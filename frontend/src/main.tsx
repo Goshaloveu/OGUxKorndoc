@@ -5,9 +5,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider, ToasterComponent, configure, Lang } from '@gravity-ui/uikit';
 import { ToasterProvider } from '@gravity-ui/uikit';
 import { toaster } from '@gravity-ui/uikit/toaster-singleton';
+import { configure as configureMarkdownEditor } from '@gravity-ui/markdown-editor';
 import { settings } from '@gravity-ui/date-utils';
 import '@gravity-ui/uikit/styles/fonts.css';
 import '@gravity-ui/uikit/styles/styles.css';
+import '@gravity-ui/markdown-editor/styles/styles.css';
 import './index.css';
 import App from './App';
 import { ThemeContext } from './hooks/useTheme';
@@ -54,10 +56,12 @@ const Root: React.FC = () => {
           .then(() => {
             settings.setLocale(l);
             configure({ lang: LANG_TO_GRAVITY[l] ?? Lang.En });
+            configureMarkdownEditor({ lang: l });
             setLangRaw(l);
           })
           .catch(() => {
             configure({ lang: LANG_TO_GRAVITY[l] ?? Lang.En });
+            configureMarkdownEditor({ lang: l });
             setLangRaw(l);
           });
       },
@@ -96,6 +100,7 @@ async function bootstrap() {
     // fallback to English if locale load fails
   }
   configure({ lang: LANG_TO_GRAVITY[initLang] ?? Lang.En });
+  configureMarkdownEditor({ lang: initLang });
   ReactDOM.createRoot(document.getElementById('root')!).render(<Root />);
 }
 

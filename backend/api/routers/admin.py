@@ -19,13 +19,14 @@ from datetime import UTC, datetime
 
 from dependencies import require_admin
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 from shared.config import settings
 from shared.database import get_db
 from shared.models import (
     AuditLog,
     Document,
     DocumentPermission,
+    FAQItem,
     Organization,
     OrganizationMember,
     User,
@@ -122,9 +123,178 @@ class HealthOut(BaseModel):
     checked_at: datetime
 
 
+class FAQItemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    question: str
+    answer: str
+    order: int
+    is_published: bool
+    created_by: int
+    created_by_username: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class FAQItemListOut(BaseModel):
+    items: list[FAQItemOut]
+    total: int
+
+
+class FAQItemCreateRequest(BaseModel):
+    question: str
+    answer: str
+    order: int = 0
+    is_published: bool = True
+
+    @field_validator("question", "answer")
+    @classmethod
+    def validate_non_empty(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Поле не может быть пустым")
+        return stripped
+
+
+class FAQItemUpdateRequest(BaseModel):
+    question: str | None = None
+    answer: str | None = None
+    order: int | None = None
+    is_published: bool | None = None
+
+    @field_validator("question", "answer")
+    @classmethod
+    def validate_optional_non_empty(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Поле не может быть пустым")
+        return stripped
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
+
+async def _faq_out(item: FAQItem, db: AsyncSession) -> FAQItemOut:
+    creator = await db.get(User, item.created_by)
+    return FAQItemOut(
+        id=item.id,
+        question=item.question,
+        answer=item.answer,
+        order=item.order,
+        is_published=item.is_published,
+        created_by=item.created_by,
+        created_by_username=creator.username if creator else None,
+        created_at=item.created_at,
+        updated_at=item.updated_at,
+    )
+
+
+@router.get("/faq", response_model=FAQItemListOut)
+async def list_faq_items(
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all FAQ items for admin management."""
+    count_result = await db.execute(select(func.count(FAQItem.id)))
+    total = count_result.scalar() or 0
+
+    result = await db.execute(
+        select(FAQItem).order_by(FAQItem.order.asc(), FAQItem.created_at.asc(), FAQItem.id.asc())
+    )
+    items = [_faq_out(item, db) for item in result.scalars().all()]
+    return FAQItemListOut(items=[await item for item in items], total=total)
+
+
+@router.post("/faq", response_model=FAQItemOut, status_code=201)
+async def create_faq_item(
+    body: FAQItemCreateRequest,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create FAQ item (admin only)."""
+    item = FAQItem(
+        question=body.question,
+        answer=body.answer,
+        order=body.order,
+        is_published=body.is_published,
+        created_by=admin.id,
+    )
+    db.add(item)
+    db.add(
+        AuditLog(
+            user_id=admin.id,
+            action="create",
+            resource_type="faq",
+            details={"question": body.question},
+        )
+    )
+    await db.commit()
+    await db.refresh(item)
+    return await _faq_out(item, db)
+
+
+@router.patch("/faq/{faq_id}", response_model=FAQItemOut)
+async def update_faq_item(
+    faq_id: int,
+    body: FAQItemUpdateRequest,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update FAQ item (admin only)."""
+    item = await db.get(FAQItem, faq_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="FAQ-запись не найдена")
+
+    if body.question is not None:
+        item.question = body.question
+    if body.answer is not None:
+        item.answer = body.answer
+    if body.order is not None:
+        item.order = body.order
+    if body.is_published is not None:
+        item.is_published = body.is_published
+
+    db.add(
+        AuditLog(
+            user_id=admin.id,
+            action="update",
+            resource_type="faq",
+            resource_id=str(faq_id),
+            details={"question": item.question},
+        )
+    )
+    await db.commit()
+    await db.refresh(item)
+    return await _faq_out(item, db)
+
+
+@router.delete("/faq/{faq_id}", status_code=204)
+async def delete_faq_item(
+    faq_id: int,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete FAQ item (admin only)."""
+    item = await db.get(FAQItem, faq_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="FAQ-запись не найдена")
+
+    db.add(
+        AuditLog(
+            user_id=admin.id,
+            action="delete",
+            resource_type="faq",
+            resource_id=str(faq_id),
+            details={"question": item.question},
+        )
+    )
+    await db.delete(item)
+    await db.commit()
 
 
 @router.get("/users", response_model=UserListOut)

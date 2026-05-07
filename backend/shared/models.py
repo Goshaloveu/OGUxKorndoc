@@ -41,6 +41,7 @@ class User(Base):
     chat_sessions: Mapped[list["ChatSession"]] = relationship(
         "ChatSession", back_populates="user", cascade="all, delete-orphan"
     )
+    faq_items: Mapped[list["FAQItem"]] = relationship("FAQItem", back_populates="creator")
 
 
 class Organization(Base):
@@ -194,6 +195,27 @@ class ChatSession(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+      
+    
+class FAQItem(Base):
+    __tablename__ = "faq_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    question: Mapped[str] = mapped_column(String(500), nullable=False)
+    answer: Mapped[str] = mapped_column(Text, nullable=False)
+    order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    is_published: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_by: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+    creator: Mapped["User"] = relationship("User", back_populates="faq_items")
 
     user: Mapped["User"] = relationship("User", back_populates="chat_sessions")
     messages: Mapped[list["ChatMessage"]] = relationship(

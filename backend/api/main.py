@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import admin, auth, chat, documents, organizations, profile, search, users
+from routers import admin, auth, chat, documents, faq, organizations, profile, search, users
 from sentence_transformers import SentenceTransformer
 from shared.config import settings
 from shared.llm import ChatLLM
@@ -43,6 +43,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(documents.router)
 app.include_router(search.router)
+app.include_router(faq.router)
 app.include_router(admin.router)
 app.include_router(profile.router)
 app.include_router(organizations.router)
