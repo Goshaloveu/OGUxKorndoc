@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from routers import admin, auth, chat, documents, faq, organizations, profile, search, users
 from sentence_transformers import SentenceTransformer
 from shared.config import settings
+from shared.llm import ChatLLM
 
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper(), logging.INFO),
@@ -19,7 +20,9 @@ async def lifespan(app: FastAPI):
     logger.info("Loading embedding model: %s", settings.embedding_model)
     app.state.embedder = SentenceTransformer(settings.embedding_model)
     logger.info("Embedding model loaded")
+    app.state.llm = ChatLLM()
     yield
+    await app.state.llm.close()
     logger.info("Shutting down")
 
 
