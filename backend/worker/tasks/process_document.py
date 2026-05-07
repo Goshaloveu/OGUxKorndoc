@@ -42,31 +42,11 @@ def _get_qdrant_client():
 def _ensure_collection(client) -> None:
     """Create the Qdrant collection if it does not exist yet."""
     from qdrant_client.http.exceptions import UnexpectedResponse
-    from qdrant_client.http.models import (
-        Distance,
-        SparseIndexParams,
-        SparseVectorParams,
-        VectorParams,
-    )
 
     existing = [c.name for c in client.get_collections().collections]
     if settings.qdrant_collection not in existing:
         try:
-            client.create_collection(
-                collection_name=settings.qdrant_collection,
-                vectors_config={
-                    "dense": VectorParams(size=settings.embedding_dim, distance=Distance.COSINE)
-                },
-                sparse_vectors_config={
-                    "sparse": SparseVectorParams(index=SparseIndexParams(on_disk=False))
-                },
-            )
-            logger.info(
-                "Created Qdrant collection '%s' (dense dim=%d, sparse=%s)",
-                settings.qdrant_collection,
-                settings.embedding_dim,
-                settings.sparse_embedding_model,
-            )
+            _create_collection(client)
         except UnexpectedResponse as e:
             if e.status_code == 409:
                 logger.info(
@@ -86,33 +66,25 @@ def _ensure_collection(client) -> None:
         sparse_vectors_config.get("sparse") if isinstance(sparse_vectors_config, dict) else None
     )
     if dense_config is None or sparse_config is None:
-        msg = (
-            f"Qdrant collection '{settings.qdrant_collection}' must use named vectors "
-            "'dense' and 'sparse' for hybrid search. Recreate it and run reindex_all_documents."
+        _handle_collection_mismatch(
+            client,
+            "must use named vectors 'dense' and 'sparse' for hybrid search",
         )
-        logger.error(msg)
-        raise RuntimeError(msg)
+        return
     if dense_config.size != settings.embedding_dim:
-        msg = (
-            f"Qdrant collection '{settings.qdrant_collection}' dense vector size is "
-            f"{dense_config.size}, expected {settings.embedding_dim}"
+        _handle_collection_mismatch(
+            client,
+            f"dense vector size is {dense_config.size}, expected {settings.embedding_dim}",
         )
-        logger.error(msg)
-        raise RuntimeError(msg)
 
 
-def _recreate_collection(client) -> None:
-    """Explicitly recreate the collection before a full migration reindex."""
+def _create_collection(client) -> None:
     from qdrant_client.http.models import (
         Distance,
         SparseIndexParams,
         SparseVectorParams,
         VectorParams,
     )
-
-    existing = [c.name for c in client.get_collections().collections]
-    if settings.qdrant_collection in existing:
-        client.delete_collection(collection_name=settings.qdrant_collection)
 
     client.create_collection(
         collection_name=settings.qdrant_collection,
@@ -123,6 +95,36 @@ def _recreate_collection(client) -> None:
             "sparse": SparseVectorParams(index=SparseIndexParams(on_disk=False))
         },
     )
+    logger.info(
+        "Created Qdrant collection '%s' (dense dim=%d, sparse=%s)",
+        settings.qdrant_collection,
+        settings.embedding_dim,
+        settings.sparse_embedding_model,
+    )
+
+
+def _handle_collection_mismatch(client, reason: str) -> None:
+    message = f"Qdrant collection '{settings.qdrant_collection}' {reason}."
+    if not settings.allow_qdrant_recreate_on_mismatch:
+        logger.error("%s Recreate it and run reindex_all_documents.", message)
+        raise RuntimeError(f"{message} Recreate it and run reindex_all_documents.")
+
+    logger.warning(
+        "%s Recreating it because ENVIRONMENT=%s. Run reindex_all_documents after startup.",
+        message,
+        settings.environment,
+    )
+    client.delete_collection(collection_name=settings.qdrant_collection)
+    _create_collection(client)
+
+
+def _recreate_collection(client) -> None:
+    """Explicitly recreate the collection before a full migration reindex."""
+    existing = [c.name for c in client.get_collections().collections]
+    if settings.qdrant_collection in existing:
+        client.delete_collection(collection_name=settings.qdrant_collection)
+
+    _create_collection(client)
     logger.info("Recreated Qdrant collection '%s' for hybrid search", settings.qdrant_collection)
 
 

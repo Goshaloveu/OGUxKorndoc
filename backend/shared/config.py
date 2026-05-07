@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     qdrant_host: str = "qdrant"
     qdrant_port: int = 6333
     qdrant_collection: str = "documents"
+    qdrant_recreate_on_mismatch: bool = False
 
     # JWT
     secret_key: str = "supersecretkey_change_in_production_minimum_32_chars"
@@ -52,6 +53,14 @@ class Settings(BaseSettings):
     # App
     environment: str = "development"
     log_level: str = "INFO"
+
+    @property
+    def allow_qdrant_recreate_on_mismatch(self) -> bool:
+        return self.qdrant_recreate_on_mismatch or self.environment.lower() in {
+            "dev",
+            "development",
+            "local",
+        }
 
     @property
     def database_url(self) -> str:
