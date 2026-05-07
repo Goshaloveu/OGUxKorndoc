@@ -6,10 +6,11 @@ import AuditLogTab from '../components/admin/AuditLogTab';
 import HealthTab from '../components/admin/HealthTab';
 import OrganizationsTab from '../components/admin/OrganizationsTab';
 import DocumentsTab from '../components/admin/DocumentsTab';
+import FAQTab from '../components/admin/FAQTab';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { useTranslation } from '../i18n';
 
-type TabId = 'users' | 'orgs' | 'documents' | 'stats' | 'audit' | 'health';
+type TabId = 'users' | 'orgs' | 'documents' | 'faq' | 'stats' | 'audit' | 'health';
 
 const AdminPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>('users');
@@ -24,6 +25,7 @@ const AdminPage: React.FC = () => {
           <Tab value="users">{t('users')}</Tab>
           <Tab value="orgs">{t('organizations')}</Tab>
           <Tab value="documents">{t('documents')}</Tab>
+          <Tab value="faq">{t('faq')}</Tab>
           <Tab value="stats">{t('stats')}</Tab>
           <Tab value="audit">{t('audit')}</Tab>
           <Tab value="health">{t('health')}</Tab>
@@ -44,6 +46,11 @@ const AdminPage: React.FC = () => {
         {activeTab === 'documents' && (
           <ErrorBoundary fallbackTitle={t('documentsError')}>
             <DocumentsTab />
+          </ErrorBoundary>
+        )}
+        {activeTab === 'faq' && (
+          <ErrorBoundary fallbackTitle={t('faqError')}>
+            <FAQTab />
           </ErrorBoundary>
         )}
         {activeTab === 'stats' && (
