@@ -6,9 +6,10 @@ import AuditLogTab from '../components/admin/AuditLogTab';
 import HealthTab from '../components/admin/HealthTab';
 import OrganizationsTab from '../components/admin/OrganizationsTab';
 import DocumentsTab from '../components/admin/DocumentsTab';
+import FAQTab from '../components/admin/FAQTab';
 import ErrorBoundary from '../components/ErrorBoundary';
 
-type TabId = 'users' | 'orgs' | 'documents' | 'stats' | 'audit' | 'health';
+type TabId = 'users' | 'orgs' | 'documents' | 'faq' | 'stats' | 'audit' | 'health';
 
 const AdminPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>('users');
@@ -22,6 +23,7 @@ const AdminPage: React.FC = () => {
           <Tab value="users">Пользователи</Tab>
           <Tab value="orgs">Организации</Tab>
           <Tab value="documents">Документы</Tab>
+          <Tab value="faq">FAQ</Tab>
           <Tab value="stats">Статистика</Tab>
           <Tab value="audit">Журнал действий</Tab>
           <Tab value="health">Здоровье системы</Tab>
@@ -42,6 +44,11 @@ const AdminPage: React.FC = () => {
         {activeTab === 'documents' && (
           <ErrorBoundary fallbackTitle="Ошибка вкладки «Документы»">
             <DocumentsTab />
+          </ErrorBoundary>
+        )}
+        {activeTab === 'faq' && (
+          <ErrorBoundary fallbackTitle="Ошибка вкладки «FAQ»">
+            <FAQTab />
           </ErrorBoundary>
         )}
         {activeTab === 'stats' && (
