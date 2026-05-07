@@ -5,10 +5,13 @@ import { Button, Card, Text, TextInput, Alert } from '@gravity-ui/uikit';
 import { loginUser } from '../api/auth';
 import type { LoginRequest } from '../api/auth';
 import axios from 'axios';
+import { useTranslation } from '../i18n';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const t = useTranslation('login');
+  const tApp = useTranslation('app');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,8 +33,8 @@ const LoginPage: React.FC = () => {
 
   const errorMessage = mutation.isError
     ? axios.isAxiosError(mutation.error) && mutation.error.response?.status === 401
-      ? 'Неверный email или пароль'
-      : 'Ошибка подключения к серверу'
+      ? t('invalidCredentials')
+      : t('connectionError')
     : null;
 
   return (
@@ -47,19 +50,19 @@ const LoginPage: React.FC = () => {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem' }}>
         {/* Logo */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
-          <img src="/logo.svg" width={64} height={64} alt="КорнДок" />
+          <img src="/logo.svg" width={64} height={64} alt={tApp('brand')} />
           <div style={{ textAlign: 'center' }}>
             <Text
               variant="header-2"
               style={{ color: 'var(--g-color-text-primary)', display: 'block', fontWeight: 700, letterSpacing: -0.5 }}
             >
-              КорнДок
+              {tApp('brand')}
             </Text>
             <Text
               variant="body-2"
               style={{ color: 'var(--g-color-text-secondary)', display: 'block' }}
             >
-              Корпоративное хранилище документов
+              {tApp('brandSubtitle')}
             </Text>
           </div>
         </div>
@@ -76,7 +79,7 @@ const LoginPage: React.FC = () => {
           }}
         >
           <Text variant="subheader-3" style={{ textAlign: 'center', color: 'var(--g-color-text-secondary)' }}>
-            Войдите в систему
+            {t('title')}
           </Text>
 
           {errorMessage && (
@@ -99,7 +102,7 @@ const LoginPage: React.FC = () => {
             />
 
             <TextInput
-              label="Пароль"
+              label={t('password')}
               type="password"
               size="l"
               value={password}
@@ -117,7 +120,7 @@ const LoginPage: React.FC = () => {
               loading={mutation.isPending}
               disabled={!email || !password}
             >
-              Войти
+              {t('submit')}
             </Button>
           </form>
         </Card>

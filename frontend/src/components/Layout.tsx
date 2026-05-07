@@ -19,6 +19,7 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { useThemeContext } from '../hooks/useTheme';
 import type { AppLang } from '../hooks/useTheme';
+import { useTranslation } from '../i18n';
 import NotificationBell from './NotificationBell';
 import './Layout.css';
 
@@ -38,6 +39,8 @@ const Layout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { theme, setTheme, lang, setLang } = useThemeContext();
+  const t = useTranslation('app');
+  const tLayout = useTranslation('layout');
   const [compact, setCompactState] = useState(loadCompact);
 
   const handleCompact = (v: boolean) => {
@@ -48,7 +51,7 @@ const Layout: React.FC = () => {
   if (isLoading) {
     return (
       <div className="layout-loading">
-        <Text variant="body-1">Загрузка...</Text>
+        <Text variant="body-1">{t('loading')}</Text>
       </div>
     );
   }
@@ -61,42 +64,42 @@ const Layout: React.FC = () => {
   const menuItems = [
     {
       id: 'home',
-      title: 'Главная',
+      title: t('home'),
       icon: House,
       current: isActive('/'),
       onItemClick: () => navigate('/'),
     },
     {
       id: 'search',
-      title: 'Поиск',
+      title: t('search'),
       icon: Magnifier,
       current: isActive('/search'),
       onItemClick: () => navigate('/search'),
     },
     {
       id: 'upload',
-      title: 'Загрузить',
+      title: t('upload'),
       icon: ArrowUpFromLine,
       current: isActive('/upload'),
       onItemClick: () => navigate('/upload'),
     },
     {
       id: 'documents',
-      title: 'Документы',
+      title: t('documents'),
       icon: Folder,
       current: isActive('/documents'),
       onItemClick: () => navigate('/documents'),
     },
     {
       id: 'ai',
-      title: 'AI Ассистент',
+      title: t('aiAssistant'),
       icon: FaceRobot,
       current: isActive('/ai'),
       onItemClick: () => navigate('/ai'),
     },
     {
       id: 'profile',
-      title: 'Профиль',
+      title: t('profile'),
       icon: Person,
       current: isActive('/profile'),
       onItemClick: () => navigate('/profile'),
@@ -110,7 +113,7 @@ const Layout: React.FC = () => {
           },
           {
             id: 'admin',
-            title: 'Администрирование',
+            title: t('administration'),
             icon: EyeDashed,
             current: isActive('/admin'),
             onItemClick: () => navigate('/admin'),
@@ -122,7 +125,7 @@ const Layout: React.FC = () => {
   return (
     <AsideHeader
       logo={{
-        text: 'КорнДок',
+        text: t('brand'),
         iconSrc: '/logo.svg',
         iconSize: 32,
         href: '/',
@@ -140,13 +143,13 @@ const Layout: React.FC = () => {
                 {user.username}
               </Text>
               <Text variant="caption-2" color="hint">
-                {user.role === 'admin' ? 'Администратор' : 'Пользователь'}
+                {user.role === 'admin' ? t('admin') : t('user')}
               </Text>
             </div>
           )}
           <FooterItem
             id="faq"
-            title="FAQ"
+            title={tLayout('faq')}
             icon={CircleQuestion}
             compact={isCompact}
             current={isActive('/faq')}
@@ -154,7 +157,7 @@ const Layout: React.FC = () => {
           />
           <FooterItem
             id="settings"
-            title="Настройки"
+            title={t('settings')}
             icon={Gear}
             compact={isCompact}
             current={isActive('/settings')}
@@ -162,7 +165,7 @@ const Layout: React.FC = () => {
           />
           <FooterItem
             id="logout"
-            title="Выйти"
+            title={t('logout')}
             icon={ArrowRightFromSquare}
             compact={isCompact}
             onItemClick={logout}

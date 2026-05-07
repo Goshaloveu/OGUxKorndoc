@@ -15,9 +15,11 @@ import {
   getProfile,
   updateProfile,
 } from '../api/profile';
+import { useTranslation } from '../i18n';
+import { useThemeContext } from '../hooks/useTheme';
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('ru-RU', {
+function formatDate(iso: string, lang: string): string {
+  return new Date(iso).toLocaleDateString(lang === 'en' ? 'en-US' : 'ru-RU', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -27,6 +29,9 @@ function formatDate(iso: string): string {
 const ProfilePage: React.FC = () => {
   const queryClient = useQueryClient();
   const { addNotification } = useNotifications();
+  const { lang } = useThemeContext();
+  const t = useTranslation('profilePage');
+  const tApp = useTranslation('app');
 
   const [editUsername, setEditUsername] = useState('');
   const [editEmail, setEditEmail] = useState('');
@@ -43,7 +48,7 @@ const ProfilePage: React.FC = () => {
   const updateMutation = useMutation({
     mutationFn: updateProfile,
     onSuccess: () => {
-      addNotification('success', 'settings', 'Профиль обновлён');
+      addNotification('success', 'settings', t('profileUpdated'));
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       queryClient.invalidateQueries({ queryKey: ['me'] });
       setIsEditing(false);
@@ -52,7 +57,7 @@ const ProfilePage: React.FC = () => {
       addNotification(
         'error',
         'settings',
-        'Ошибка обновления профиля',
+        t('profileUpdateError'),
         err.response?.data?.detail,
       );
     },
@@ -61,7 +66,7 @@ const ProfilePage: React.FC = () => {
   const passwordMutation = useMutation({
     mutationFn: changePassword,
     onSuccess: () => {
-      addNotification('success', 'settings', 'Пароль успешно изменён');
+      addNotification('success', 'settings', t('passwordChanged'));
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -70,7 +75,7 @@ const ProfilePage: React.FC = () => {
       addNotification(
         'error',
         'settings',
-        'Ошибка смены пароля',
+        t('passwordChangeError'),
         err.response?.data?.detail,
       );
     },
@@ -93,7 +98,7 @@ const ProfilePage: React.FC = () => {
 
   const handlePasswordChange = () => {
     if (newPassword !== confirmPassword) {
-      addNotification('error', 'settings', 'Пароли не совпадают', 'Введите одинаковый новый пароль в оба поля');
+      addNotification('error', 'settings', t('passwordMismatch'), t('passwordMismatchDescription'));
       return;
     }
     passwordMutation.mutate({ old_password: oldPassword, new_password: newPassword });
@@ -109,14 +114,14 @@ const ProfilePage: React.FC = () => {
   }
 
   if (isError || !profile) {
-    return <Alert theme="danger" title="Ошибка" message="Не удалось загрузить профиль" />;
+    return <Alert theme="danger" title={tApp('error')} message={t('loadError')} />;
   }
 
   const { user, my_documents_count, recent_searches } = profile;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: 900 }}>
-      <Text variant="header-1">Профиль</Text>
+      <Text variant="header-1">{tApp('profile')}</Text>
 
       {/* User card */}
       <Card style={{ padding: '1.5rem' }}>
@@ -126,23 +131,23 @@ const ProfilePage: React.FC = () => {
             <Text color="secondary">{user.email}</Text>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
               <Label theme={user.role === 'admin' ? 'danger' : 'info'}>
-                {user.role === 'admin' ? 'Администратор' : 'Пользователь'}
+                {user.role === 'admin' ? tApp('admin') : tApp('user')}
               </Label>
               <Text color="secondary" variant="caption-2">
-                Зарегистрирован: {formatDate(user.created_at)}
+                {t('registered', { date: formatDate(user.created_at, lang) })}
               </Text>
               {user.last_login && (
                 <Text color="secondary" variant="caption-2">
-                  · Последний вход: {formatDate(user.last_login)}
+                  {t('lastLogin', { date: formatDate(user.last_login, lang) })}
                 </Text>
               )}
             </div>
           </div>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            <Text color="secondary">Документов: <strong>{my_documents_count}</strong></Text>
+            <Text color="secondary">{t('documentsCount', { count: my_documents_count })}</Text>
             {!isEditing && (
               <Button view="action" onClick={startEdit}>
-                Редактировать
+                {tApp('edit')}
               </Button>
             )}
           </div>
@@ -150,14 +155,14 @@ const ProfilePage: React.FC = () => {
 
         {isEditing && (
           <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <Text variant="subheader-2">Редактирование профиля</Text>
+            <Text variant="subheader-2">{t('editProfile')}</Text>
             <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 200, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <Text variant="caption-2" color="secondary">Имя пользователя</Text>
+                <Text variant="caption-2" color="secondary">{t('username')}</Text>
                 <TextInput
                   value={editUsername}
                   onUpdate={setEditUsername}
-                  placeholder="Имя пользователя"
+                  placeholder={t('username')}
                 />
               </div>
               <div style={{ flex: 1, minWidth: 200, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -176,10 +181,10 @@ const ProfilePage: React.FC = () => {
                 loading={updateMutation.isPending}
                 onClick={saveEdit}
               >
-                Сохранить
+                {tApp('save')}
               </Button>
               <Button view="flat" onClick={() => setIsEditing(false)}>
-                Отмена
+                {tApp('cancel')}
               </Button>
             </div>
           </div>
@@ -189,34 +194,34 @@ const ProfilePage: React.FC = () => {
       {/* Change password */}
       <Card style={{ padding: '1.5rem' }}>
         <Text variant="subheader-2" style={{ marginBottom: '1rem' }}>
-          Смена пароля
+          {t('changePassword')}
         </Text>
         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <div style={{ minWidth: 180, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <Text variant="caption-2" color="secondary">Текущий пароль</Text>
+            <Text variant="caption-2" color="secondary">{t('oldPassword')}</Text>
             <TextInput
               type="password"
               value={oldPassword}
               onUpdate={setOldPassword}
-              placeholder="Текущий пароль"
+              placeholder={t('oldPassword')}
             />
           </div>
           <div style={{ minWidth: 180, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <Text variant="caption-2" color="secondary">Новый пароль</Text>
+            <Text variant="caption-2" color="secondary">{t('newPassword')}</Text>
             <TextInput
               type="password"
               value={newPassword}
               onUpdate={setNewPassword}
-              placeholder="Новый пароль"
+              placeholder={t('newPassword')}
             />
           </div>
           <div style={{ minWidth: 180, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <Text variant="caption-2" color="secondary">Повторите пароль</Text>
+            <Text variant="caption-2" color="secondary">{t('confirmPassword')}</Text>
             <TextInput
               type="password"
               value={confirmPassword}
               onUpdate={setConfirmPassword}
-              placeholder="Повторите пароль"
+              placeholder={t('confirmPassword')}
             />
           </div>
           <Button
@@ -225,7 +230,7 @@ const ProfilePage: React.FC = () => {
             onClick={handlePasswordChange}
             disabled={!oldPassword || !newPassword || !confirmPassword}
           >
-            Сменить пароль
+            {t('changePassword')}
           </Button>
         </div>
       </Card>
@@ -234,13 +239,13 @@ const ProfilePage: React.FC = () => {
       {recent_searches.length > 0 && (
         <Card style={{ padding: '1.5rem' }}>
           <Text variant="subheader-2" style={{ marginBottom: '1rem' }}>
-            Последние поиски
+            {t('recentSearches')}
           </Text>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {recent_searches.map((s, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Text>"{s.query}"</Text>
-                <Text color="secondary" variant="caption-2">{formatDate(s.created_at)}</Text>
+                <Text color="secondary" variant="caption-2">{formatDate(s.created_at, lang)}</Text>
               </div>
             ))}
           </div>

@@ -7,55 +7,57 @@ import HealthTab from '../components/admin/HealthTab';
 import OrganizationsTab from '../components/admin/OrganizationsTab';
 import DocumentsTab from '../components/admin/DocumentsTab';
 import ErrorBoundary from '../components/ErrorBoundary';
+import { useTranslation } from '../i18n';
 
 type TabId = 'users' | 'orgs' | 'documents' | 'stats' | 'audit' | 'health';
 
 const AdminPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>('users');
+  const t = useTranslation('adminPage');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <Text variant="header-1">Администрирование</Text>
+      <Text variant="header-1">{t('title')}</Text>
 
       <TabProvider value={activeTab} onUpdate={(v) => setActiveTab(v as TabId)}>
         <TabList size="l">
-          <Tab value="users">Пользователи</Tab>
-          <Tab value="orgs">Организации</Tab>
-          <Tab value="documents">Документы</Tab>
-          <Tab value="stats">Статистика</Tab>
-          <Tab value="audit">Журнал действий</Tab>
-          <Tab value="health">Здоровье системы</Tab>
+          <Tab value="users">{t('users')}</Tab>
+          <Tab value="orgs">{t('organizations')}</Tab>
+          <Tab value="documents">{t('documents')}</Tab>
+          <Tab value="stats">{t('stats')}</Tab>
+          <Tab value="audit">{t('audit')}</Tab>
+          <Tab value="health">{t('health')}</Tab>
         </TabList>
       </TabProvider>
 
       <div>
         {activeTab === 'users' && (
-          <ErrorBoundary fallbackTitle="Ошибка вкладки «Пользователи»">
+          <ErrorBoundary fallbackTitle={t('usersError')}>
             <UsersTab />
           </ErrorBoundary>
         )}
         {activeTab === 'orgs' && (
-          <ErrorBoundary fallbackTitle="Ошибка вкладки «Организации»">
+          <ErrorBoundary fallbackTitle={t('orgsError')}>
             <OrganizationsTab />
           </ErrorBoundary>
         )}
         {activeTab === 'documents' && (
-          <ErrorBoundary fallbackTitle="Ошибка вкладки «Документы»">
+          <ErrorBoundary fallbackTitle={t('documentsError')}>
             <DocumentsTab />
           </ErrorBoundary>
         )}
         {activeTab === 'stats' && (
-          <ErrorBoundary fallbackTitle="Ошибка вкладки «Статистика»">
+          <ErrorBoundary fallbackTitle={t('statsError')}>
             <StatsTab />
           </ErrorBoundary>
         )}
         {activeTab === 'audit' && (
-          <ErrorBoundary fallbackTitle="Ошибка вкладки «Журнал действий»">
+          <ErrorBoundary fallbackTitle={t('auditError')}>
             <AuditLogTab />
           </ErrorBoundary>
         )}
         {activeTab === 'health' && (
-          <ErrorBoundary fallbackTitle="Ошибка вкладки «Здоровье системы»">
+          <ErrorBoundary fallbackTitle={t('healthError')}>
             <HealthTab />
           </ErrorBoundary>
         )}

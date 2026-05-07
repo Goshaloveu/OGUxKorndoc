@@ -6,28 +6,13 @@ import { getDocuments } from '../api/documents';
 import { useAuth } from '../hooks/useAuth';
 import DocumentTable from '../components/DocumentTable';
 import DocumentGrid from '../components/DocumentGrid';
+import { useTranslation } from '../i18n';
 
 type SortKey = 'title' | 'uploaded_at' | 'file_size';
 type SortDir = 'asc' | 'desc';
 type ViewMode = 'list' | 'grid-large' | 'grid-small';
 
 const VIEW_MODE_KEY = 'docs-view-mode';
-
-const FILE_TYPE_OPTIONS = [
-  { value: '', content: 'Все типы' },
-  { value: 'pdf', content: 'PDF' },
-  { value: 'docx', content: 'DOCX' },
-  { value: 'xlsx', content: 'XLSX' },
-  { value: 'txt', content: 'TXT' },
-];
-
-const STATUS_OPTIONS = [
-  { value: '', content: 'Все статусы' },
-  { value: 'pending', content: 'В очереди' },
-  { value: 'processing', content: 'Обработка' },
-  { value: 'indexed', content: 'Индексирован' },
-  { value: 'error', content: 'Ошибка' },
-];
 
 const PAGE_SIZE = 20;
 
@@ -39,6 +24,8 @@ function loadViewMode(): ViewMode {
 
 const DocumentsPage: React.FC = () => {
   const { user } = useAuth();
+  const t = useTranslation('documentsPage');
+  const tApp = useTranslation('app');
   const isAdmin = user?.role === 'admin';
 
   const [page, setPage] = useState(1);
@@ -71,6 +58,21 @@ const DocumentsPage: React.FC = () => {
       }),
   });
 
+  const fileTypeOptions = [
+    { value: '', content: tApp('allTypes') },
+    { value: 'pdf', content: 'PDF' },
+    { value: 'docx', content: 'DOCX' },
+    { value: 'xlsx', content: 'XLSX' },
+    { value: 'txt', content: 'TXT' },
+  ];
+  const statusOptions = [
+    { value: '', content: tApp('allStatuses') },
+    { value: 'pending', content: tApp('pending') },
+    { value: 'processing', content: tApp('processing') },
+    { value: 'indexed', content: tApp('indexed') },
+    { value: 'error', content: tApp('error') },
+  ];
+
   // Build unique owner options from all loaded documents
   const ownerOptions = React.useMemo(() => {
     if (!data) return [];
@@ -81,11 +83,11 @@ const DocumentsPage: React.FC = () => {
       if (!seen.has(name)) {
         seen.add(name);
         const isMe = doc.uploaded_by === user?.id;
-        opts.push({ value: name, content: isMe ? `${name} (вы)` : name });
+        opts.push({ value: name, content: isMe ? t('ownerMe', { name }) : name });
       }
     }
     return opts;
-  }, [data, user?.id]);
+  }, [data, user?.id, t]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -133,7 +135,7 @@ const DocumentsPage: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      <Text variant="header-1">Документы</Text>
+      <Text variant="header-1">{t('title')}</Text>
 
       {/* Filters + view switcher row */}
       <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -141,8 +143,8 @@ const DocumentsPage: React.FC = () => {
           <Select
             value={fileTypeFilter ? [fileTypeFilter] : ['']}
             onUpdate={(val) => setFileTypeFilter(val[0] === '' ? '' : val[0])}
-            options={FILE_TYPE_OPTIONS}
-            placeholder="Тип файла"
+            options={fileTypeOptions}
+            placeholder={t('fileTypePlaceholder')}
             width="max"
           />
         </div>
@@ -150,8 +152,8 @@ const DocumentsPage: React.FC = () => {
           <Select
             value={statusFilter ? [statusFilter] : ['']}
             onUpdate={(val) => setStatusFilter(val[0] === '' ? '' : val[0])}
-            options={STATUS_OPTIONS}
-            placeholder="Статус"
+            options={statusOptions}
+            placeholder={t('statusPlaceholder')}
             width="max"
           />
         </div>
@@ -160,7 +162,7 @@ const DocumentsPage: React.FC = () => {
             value={ownerFilter}
             onUpdate={(val) => { setOwnerFilter(val); setPage(1); }}
             options={ownerOptions}
-            placeholder="Владелец (все)"
+            placeholder={t('ownerPlaceholder')}
             multiple
             hasClear
             width="max"
@@ -171,8 +173,8 @@ const DocumentsPage: React.FC = () => {
         {data && (
           <Text variant="caption-2" color="secondary">
             {ownerFilter.length > 0
-              ? `Показано: ${filteredAndSorted.length} / ${data.total}`
-              : `Всего: ${data.total}`}
+              ? t('shown', { shown: filteredAndSorted.length, total: data.total })
+              : t('total', { total: data.total })}
           </Text>
         )}
 
@@ -181,7 +183,7 @@ const DocumentsPage: React.FC = () => {
           <Button
             view={viewMode === 'list' ? 'action' : 'outlined'}
             size="m"
-            title="Список"
+            title={t('list')}
             onClick={() => handleViewMode('list')}
           >
             <ListUl width={16} height={16} />
@@ -189,7 +191,7 @@ const DocumentsPage: React.FC = () => {
           <Button
             view={viewMode === 'grid-large' ? 'action' : 'outlined'}
             size="m"
-            title="Плитка крупная"
+            title={t('gridLarge')}
             onClick={() => handleViewMode('grid-large')}
           >
             <LayoutCellsLarge width={16} height={16} />
@@ -197,7 +199,7 @@ const DocumentsPage: React.FC = () => {
           <Button
             view={viewMode === 'grid-small' ? 'action' : 'outlined'}
             size="m"
-            title="Плитка мелкая"
+            title={t('gridSmall')}
             onClick={() => handleViewMode('grid-small')}
           >
             <LayoutCells width={16} height={16} />
@@ -206,7 +208,7 @@ const DocumentsPage: React.FC = () => {
       </div>
 
       {isError && (
-        <Alert theme="danger" title="Ошибка загрузки" message="Не удалось загрузить список документов" />
+        <Alert theme="danger" title={t('loadErrorTitle')} message={t('loadErrorMessage')} />
       )}
 
       {viewMode === 'list' ? (
