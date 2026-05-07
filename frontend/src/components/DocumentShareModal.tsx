@@ -19,7 +19,8 @@ import {
   getDocumentPermissions,
   removeDocumentPermission,
 } from '../api/documents';
-import type { DocumentPermission } from '../types';
+import type { DocumentPermission, UserLookup } from '../types';
+import UserLookupSelect from './UserLookupSelect';
 
 const LEVEL_OPTIONS = [
   { value: 'viewer', content: 'Читатель (viewer)' },
@@ -42,7 +43,7 @@ interface DocumentShareModalProps {
 const DocumentShareModal: React.FC<DocumentShareModalProps> = ({ docId, docTitle, onClose }) => {
   const queryClient = useQueryClient();
   const { addNotification } = useNotifications();
-  const [newUserId, setNewUserId] = useState<number | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserLookup | null>(null);
   const [newOrgId, setNewOrgId] = useState<number | null>(null);
   const [newLevel, setNewLevel] = useState<string[]>(['viewer']);
   const [addTarget, setAddTarget] = useState<'user' | 'org'>('user');
@@ -56,17 +57,19 @@ const DocumentShareModal: React.FC<DocumentShareModalProps> = ({ docId, docTitle
   const addMutation = useMutation({
     mutationFn: () =>
       addDocumentPermission(docId!, {
-        ...(addTarget === 'user' ? { user_id: newUserId ?? undefined } : { org_id: newOrgId ?? undefined }),
+        ...(addTarget === 'user' ? { user_id: selectedUser?.id } : { org_id: newOrgId ?? undefined }),
         level: newLevel[0] as DocumentPermission['level'],
       }),
     onSuccess: () => {
-      const who = addTarget === 'user' ? `пользователю ID ${newUserId}` : `организации ID ${newOrgId}`;
+      const who = addTarget === 'user'
+        ? `пользователю ${selectedUser?.username ?? ''}`
+        : `организации ID ${newOrgId}`;
       addNotification(
         'success',
         'permission',
         `Права ${newLevel[0]} выданы ${who} на «${docTitle}»`,
       );
-      setNewUserId(null);
+      setSelectedUser(null);
       setNewOrgId(null);
       void queryClient.invalidateQueries({ queryKey: ['doc-permissions', docId] });
     },
@@ -92,7 +95,23 @@ const DocumentShareModal: React.FC<DocumentShareModalProps> = ({ docId, docTitle
   });
 
   const canAdd =
-    addTarget === 'user' ? newUserId !== null && newUserId > 0 : newOrgId !== null && newOrgId > 0;
+    addTarget === 'user' ? selectedUser !== null : newOrgId !== null && newOrgId > 0;
+
+  const handleTargetUpdate = (value: string[]) => {
+    const nextTarget = value[0] as 'user' | 'org';
+    setAddTarget(nextTarget);
+    setSelectedUser(null);
+    setNewOrgId(null);
+  };
+
+  const formatPermissionTarget = (perm: DocumentPermission): string => {
+    if (perm.user_id !== null) {
+      return perm.user_username && perm.user_email
+        ? `Пользователь ${perm.user_username} (${perm.user_email})`
+        : `Пользователь #${perm.user_id}`;
+    }
+    return perm.org_name ? `Организация ${perm.org_name}` : `Организация #${perm.org_id}`;
+  };
 
   return (
     <Dialog open={!!docId} onClose={onClose} size="m">
@@ -126,7 +145,7 @@ const DocumentShareModal: React.FC<DocumentShareModalProps> = ({ docId, docTitle
                   }}
                 >
                   <Text variant="body-2" style={{ flex: 1 }}>
-                    {perm.user_id !== null ? `👤 Пользователь #${perm.user_id}` : `🏢 Организация #${perm.org_id}`}
+                    {formatPermissionTarget(perm)}
                   </Text>
                   <Label theme={LEVEL_THEME[perm.level]} size="s">{perm.level}</Label>
                   <Button
@@ -156,7 +175,7 @@ const DocumentShareModal: React.FC<DocumentShareModalProps> = ({ docId, docTitle
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
               <Select
                 value={[addTarget]}
-                onUpdate={(v) => setAddTarget(v[0] as 'user' | 'org')}
+                onUpdate={handleTargetUpdate}
                 options={[
                   { value: 'user', content: 'Пользователь' },
                   { value: 'org', content: 'Организация' },
@@ -165,13 +184,10 @@ const DocumentShareModal: React.FC<DocumentShareModalProps> = ({ docId, docTitle
                 width="auto"
               />
               {addTarget === 'user' ? (
-                <NumberInput
-                  value={newUserId ?? undefined}
-                  onUpdate={(v) => setNewUserId(v ?? null)}
-                  placeholder="ID пользователя"
-                  min={1}
-                  hiddenControls
-                  size="m"
+                <UserLookupSelect
+                  value={selectedUser}
+                  onUpdate={setSelectedUser}
+                  placeholder="Найти пользователя"
                 />
               ) : (
                 <NumberInput
