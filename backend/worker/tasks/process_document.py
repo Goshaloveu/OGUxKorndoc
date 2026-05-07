@@ -58,7 +58,10 @@ def _ensure_collection(client) -> None:
             )
         except UnexpectedResponse as e:
             if e.status_code == 409:
-                logger.info("Qdrant collection '%s' already exists (race condition ignored)", settings.qdrant_collection)
+                logger.info(
+                    "Qdrant collection '%s' already exists (race condition ignored)",
+                    settings.qdrant_collection,
+                )
             else:
                 raise
 
