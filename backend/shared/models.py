@@ -35,6 +35,9 @@ class User(Base):
         "Document", back_populates="uploader", foreign_keys="Document.uploaded_by"
     )
     audit_logs: Mapped[list["AuditLog"]] = relationship("AuditLog", back_populates="user")
+    notifications: Mapped[list["Notification"]] = relationship(
+        "Notification", back_populates="user", cascade="all, delete-orphan"
+    )
     org_memberships: Mapped[list["OrganizationMember"]] = relationship(
         "OrganizationMember", back_populates="user"
     )
@@ -172,3 +175,30 @@ class AuditLog(Base):
     )
 
     user: Mapped["User"] = relationship("User", back_populates="audit_logs")
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    type: Mapped[str] = mapped_column(String(20), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), index=True
+    )
+    resource_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    resource_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "type IN ('info', 'success', 'warning', 'error')",
+            name="ck_notification_type",
+        ),
+    )
+
+    user: Mapped["User"] = relationship("User", back_populates="notifications")

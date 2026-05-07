@@ -58,7 +58,10 @@ def _ensure_collection(client) -> None:
             )
         except UnexpectedResponse as e:
             if e.status_code == 409:
-                logger.info("Qdrant collection '%s' already exists (race condition ignored)", settings.qdrant_collection)
+                logger.info(
+                    "Qdrant collection '%s' already exists (race condition ignored)",
+                    settings.qdrant_collection,
+                )
             else:
                 raise
 
@@ -258,6 +261,37 @@ def _get_document_info(document_id: int) -> dict | None:
         conn.close()
 
 
+def _create_notification(
+    *,
+    user_id: int,
+    type_: str,
+    title: str,
+    message: str,
+    resource_type: str | None = None,
+    resource_id: str | None = None,
+) -> None:
+    """Create a notification from the synchronous Celery worker context."""
+    import psycopg2
+
+    dsn = (
+        f"host={settings.postgres_host} port={settings.postgres_port} "
+        f"dbname={settings.postgres_db} user={settings.postgres_user} "
+        f"password={settings.postgres_password}"
+    )
+    conn = psycopg2.connect(dsn)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO notifications "
+                "(user_id, type, title, message, resource_type, resource_id) "
+                "VALUES (%s, %s, %s, %s, %s, %s)",
+                (user_id, type_, title, message, resource_type, resource_id),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 # ---------------------------------------------------------------------------
 # Celery task
 # ---------------------------------------------------------------------------
@@ -355,6 +389,14 @@ def process_document(self, document_id: int) -> None:
             page_count=page_count if page_count else None,
             indexed_at=datetime.now(tz=UTC),
         )
+        _create_notification(
+            user_id=uploaded_by,
+            type_="success",
+            title="Документ проиндексирован",
+            message=f'Документ "{title}" готов к поиску.',
+            resource_type="document",
+            resource_id=str(document_id),
+        )
         logger.info("Document %d successfully indexed (%d chunks)", document_id, len(chunks))
 
     except Exception as exc:
@@ -364,4 +406,13 @@ def process_document(self, document_id: int) -> None:
             "error",
             error_message=str(exc)[:1000],
         )
+        if self.request.retries >= self.max_retries:
+            _create_notification(
+                user_id=uploaded_by,
+                type_="error",
+                title="Ошибка обработки документа",
+                message=f'Не удалось обработать документ "{title}".',
+                resource_type="document",
+                resource_id=str(document_id),
+            )
         raise self.retry(exc=exc, countdown=60) from None
