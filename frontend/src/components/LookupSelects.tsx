@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { lookupOrganizations } from '../api/organizations';
 import type { OrganizationLookup } from '../api/organizations';
 import { lookupUsers } from '../api/users';
-import type { UserLookup } from '../api/users';
+import type { UserLookup } from '../types';
 
 interface UserLookupSelectProps {
   value: UserLookup | null;
