@@ -11,7 +11,14 @@ from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict
 from shared.database import get_db
 from shared.minio_client import delete_file, download_file, generate_presigned_url, upload_file
-from shared.models import AuditLog, Document, DocumentPermission, OrganizationMember, User
+from shared.models import (
+    AuditLog,
+    Document,
+    DocumentPermission,
+    Organization,
+    OrganizationMember,
+    User,
+)
 from shared.security import get_current_user
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -93,6 +100,9 @@ class PermissionOut(BaseModel):
     document_id: int
     user_id: int | None
     org_id: int | None
+    user_username: str | None = None
+    user_email: str | None = None
+    org_name: str | None = None
     level: str
     granted_by: int
     granted_at: datetime
@@ -262,10 +272,7 @@ async def list_documents(
         uname_result = await db.execute(
             select(User.id, User.username).where(User.id.in_(uploader_ids))
         )
-        username_map = {
-            row["id"]: row["username"]
-            for row in uname_result.mappings().all()
-        }
+        username_map = {row["id"]: row["username"] for row in uname_result.mappings().all()}
 
     items = [
         DocumentOut.model_validate(d).model_copy(
@@ -462,10 +469,26 @@ async def list_permissions(
     await check_document_access(document_id, "owner", current_user, db)
 
     result = await db.execute(
-        select(DocumentPermission).where(DocumentPermission.document_id == document_id)
+        select(DocumentPermission, User.username, User.email, Organization.name)
+        .outerjoin(User, User.id == DocumentPermission.user_id)
+        .outerjoin(Organization, Organization.id == DocumentPermission.org_id)
+        .where(DocumentPermission.document_id == document_id)
     )
-    perms = result.scalars().all()
-    return [PermissionOut.model_validate(p) for p in perms]
+    return [
+        PermissionOut(
+            id=perm.id,
+            document_id=perm.document_id,
+            user_id=perm.user_id,
+            org_id=perm.org_id,
+            user_username=username,
+            user_email=email,
+            org_name=org_name,
+            level=perm.level,
+            granted_by=perm.granted_by,
+            granted_at=perm.granted_at,
+        )
+        for perm, username, email, org_name in result.all()
+    ]
 
 
 @router.post("/{document_id}/permissions", response_model=PermissionOut, status_code=201)
@@ -484,6 +507,17 @@ async def add_permission(
     # Exactly one of user_id/org_id must be set
     if (body.user_id is None) == (body.org_id is None):
         raise HTTPException(status_code=400, detail="Укажите ровно одно из: user_id или org_id")
+
+    target_user: User | None = None
+    target_org: Organization | None = None
+    if body.user_id is not None:
+        target_user = await db.get(User, body.user_id)
+        if target_user is None:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+    if body.org_id is not None:
+        target_org = await db.get(Organization, body.org_id)
+        if target_org is None:
+            raise HTTPException(status_code=404, detail="Организация не найдена")
 
     perm = DocumentPermission(
         document_id=document_id,
@@ -509,7 +543,18 @@ async def add_permission(
 
     await db.commit()
     await db.refresh(perm)
-    return PermissionOut.model_validate(perm)
+    return PermissionOut(
+        id=perm.id,
+        document_id=perm.document_id,
+        user_id=perm.user_id,
+        org_id=perm.org_id,
+        user_username=target_user.username if target_user else None,
+        user_email=target_user.email if target_user else None,
+        org_name=target_org.name if target_org else None,
+        level=perm.level,
+        granted_by=perm.granted_by,
+        granted_at=perm.granted_at,
+    )
 
 
 @router.delete("/{document_id}/permissions/{permission_id}", status_code=204)
