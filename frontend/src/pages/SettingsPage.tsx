@@ -53,10 +53,10 @@ const SettingsPage: React.FC = () => {
 
       {/* Display */}
       <Card view="outlined" style={{ padding: '20px' }}>
-        <Text variant="subheader-2" style={{ marginBottom: '16px' }}>
+        <Text variant="subheader-2">
           {t('display')}
         </Text>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', marginTop: 16 }}>
           <div>
             <Text variant="body-2">{t('darkTheme')}</Text>
           </div>
@@ -72,30 +72,35 @@ const SettingsPage: React.FC = () => {
 
       {/* Notifications */}
       <Card view="outlined" style={{ padding: '20px' }}>
-        <Text variant="subheader-2" style={{ marginBottom: '8px' }}>
+        <Text variant="subheader-2">
           {t('notifications')}
         </Text>
-        <Text variant="body-2" color="secondary" style={{ marginBottom: '20px' }}>
-          {t('notificationsDescription')}
-        </Text>
-
-        {CATEGORIES.map((cat, idx) => (
-          <React.Fragment key={cat}>
-            {idx > 0 && <Divider style={{ margin: '12px 0' }} />}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <Text variant="body-2">{t(`category.${cat}`)}</Text>
-                <Text variant="caption-1" color="secondary" style={{ display: 'block', marginTop: 2 }}>
-                  {t(`categoryDescription.${cat}`)}
-                </Text>
+        <div style={{ display: 'flex', flexDirection: 'column', marginTop: 16 }}>
+          {CATEGORIES.map((cat, idx) => (
+            <React.Fragment key={cat}>
+              {idx > 0 && <Divider style={{ margin: '12px 0' }} />}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '16px',
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <Text variant="body-2">{t(`category.${cat}`)}</Text>
+                  <Text variant="caption-1" color="secondary" style={{ display: 'block', marginTop: 2 }}>
+                    {t(`categoryDescription.${cat}`)}
+                  </Text>
+                </div>
+                <Switch
+                  checked={localSettings[cat]}
+                  onUpdate={(val) => handleToggle(cat, val)}
+                />
               </div>
-              <Switch
-                checked={localSettings[cat]}
-                onUpdate={(val) => handleToggle(cat, val)}
-              />
-            </div>
-          </React.Fragment>
-        ))}
+            </React.Fragment>
+          ))}
+        </div>
       </Card>
 
       {/* Save */}

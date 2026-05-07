@@ -104,19 +104,16 @@ const HomePage: React.FC = () => {
               {t('welcome')}
             </Text>
           </div>
-          <Label theme="info" size="m">
-            {user?.role === 'admin' ? tApp('admin') : tApp('user')}
-          </Label>
         </div>
       </Card>
 
       {/* Stats row (admin only) */}
       {isAdmin && (
         <div>
-          <Text variant="subheader-2" style={{ marginBottom: '12px' }}>
+          <Text variant="subheader-2">
             {t('systemStats')}
           </Text>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', flexWrap: 'wrap', marginTop: 16 }}>
             {statsLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <Card key={i} view="outlined" style={{ padding: '16px' }}>
@@ -160,7 +157,7 @@ const HomePage: React.FC = () => {
         <Text variant="subheader-2">
           {t('quickActions')}
         </Text>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: 10 }}>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: 16 }}>
           <Button view="action" size="l" onClick={() => navigate('/search')}>
             <Icon data={Magnifier} size={16} />
             {t('findDocument')}
@@ -178,7 +175,7 @@ const HomePage: React.FC = () => {
 
       {/* Recent documents */}
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
           <Text variant="subheader-2">{t('recentDocuments')}</Text>
           <Button view="flat" size="s" onClick={() => navigate('/documents')}>
             {t('allDocuments')}

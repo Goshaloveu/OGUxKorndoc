@@ -390,7 +390,6 @@ const DocumentsTab: React.FC = () => {
           <Icon data={FileText} size={16} />
           <div style={{ overflow: 'hidden' }}>
             <Text variant="body-1" ellipsis>{d.title}</Text>
-            <Text variant="caption-2" color="secondary" ellipsis>{d.filename}</Text>
           </div>
         </div>
       ),
