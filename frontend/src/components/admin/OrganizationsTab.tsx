@@ -29,8 +29,8 @@ import {
   removeOrgMember,
 } from '../../api/organizations';
 import type { OrganizationDetail, OrganizationMember } from '../../api/organizations';
+import { UserLookupSelect } from '../LookupSelects';
 import type { UserLookup } from '../../types';
-import UserLookupSelect from '../UserLookupSelect';
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('ru-RU', {
@@ -61,7 +61,7 @@ const OrganizationsTab: React.FC = () => {
   const [editName, setEditName] = useState('');
 
   // Member add form
-  const [selectedUser, setSelectedUser] = useState<UserLookup | null>(null);
+  const [addUser, setAddUser] = useState<UserLookup | null>(null);
   const [addRole, setAddRole] = useState<string[]>(['member']);
 
   const { data, isLoading, isError } = useQuery<AdminOrgListResponse>({
@@ -137,12 +137,12 @@ const OrganizationsTab: React.FC = () => {
   const addMemberMutation = useMutation({
     mutationFn: () =>
       addOrgMember(selectedOrg!.id, {
-        user_id: selectedUser!.id,
+        user_id: addUser!.id,
         role: addRole[0] as 'owner' | 'member',
       }),
     onSuccess: () => {
       toaster.add({ name: 'member-added', title: 'Участник добавлен', theme: 'success', autoHiding: 3000 });
-      setSelectedUser(null);
+      setAddUser(null);
       void queryClient.invalidateQueries({ queryKey: ['org-detail', selectedOrg?.id] });
       void queryClient.invalidateQueries({ queryKey: ['admin', 'organizations'] });
     },
@@ -479,11 +479,9 @@ const OrganizationsTab: React.FC = () => {
                       <Text variant="caption-2" color="secondary" style={{ display: 'block', marginBottom: 4 }}>
                         Пользователь
                       </Text>
-                      <UserLookupSelect
-                        value={selectedUser}
-                        onUpdate={setSelectedUser}
-                        placeholder="Найти пользователя"
-                      />
+                      <div style={{ width: 300 }}>
+                        <UserLookupSelect value={addUser} onUpdate={setAddUser} placeholder="Найти пользователя"/>
+                      </div>
                     </div>
                     <div>
                       <Text variant="caption-2" color="secondary" style={{ display: 'block', marginBottom: 4 }}>
@@ -503,7 +501,7 @@ const OrganizationsTab: React.FC = () => {
                     <Button
                       view="action"
                       size="m"
-                      disabled={!selectedUser}
+                      disabled={!addUser}
                       loading={addMemberMutation.isPending}
                       onClick={() => addMemberMutation.mutate()}
                     >

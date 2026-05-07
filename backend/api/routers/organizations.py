@@ -20,7 +20,7 @@ from pydantic import BaseModel, ConfigDict
 from shared.database import get_db
 from shared.models import Organization, OrganizationMember, User
 from shared.security import get_current_user
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -40,6 +40,14 @@ class OrganizationOut(BaseModel):
     slug: str
     created_by: int
     created_at: datetime
+
+
+class OrganizationLookupOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    slug: str
 
 
 class MemberOut(BaseModel):
@@ -67,6 +75,9 @@ class CreateOrganizationRequest(BaseModel):
 class AddMemberRequest(BaseModel):
     user_id: int
     role: str = "member"  # "owner" | "member"
+
+
+LOOKUP_LIMIT = 10
 
 
 # ---------------------------------------------------------------------------
@@ -221,6 +232,29 @@ async def create_organization(
 
     logger.info("User %s created organization %s (slug=%s)", current_user.email, name, slug)
     return OrganizationOut.model_validate(org)
+
+
+@router.get("/lookup", response_model=list[OrganizationLookupOut])
+async def lookup_organizations(
+    q: str = "",
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lookup organizations by partial slug or name match."""
+    del current_user
+
+    query = q.strip()
+    if not query:
+        return []
+
+    pattern = f"%{query}%"
+    result = await db.execute(
+        select(Organization)
+        .where(or_(Organization.slug.ilike(pattern), Organization.name.ilike(pattern)))
+        .order_by(Organization.name, Organization.slug)
+        .limit(LOOKUP_LIMIT)
+    )
+    return [OrganizationLookupOut.model_validate(org) for org in result.scalars().all()]
 
 
 @router.get("/{org_id}", response_model=OrganizationDetailOut)

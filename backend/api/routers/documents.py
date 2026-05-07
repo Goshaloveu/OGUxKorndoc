@@ -99,10 +99,11 @@ class PermissionOut(BaseModel):
     id: int
     document_id: int
     user_id: int | None
-    org_id: int | None
     user_username: str | None = None
     user_email: str | None = None
+    org_id: int | None
     org_name: str | None = None
+    org_slug: str | None = None
     level: str
     granted_by: int
     granted_at: datetime
@@ -474,21 +475,8 @@ async def list_permissions(
         .outerjoin(Organization, Organization.id == DocumentPermission.org_id)
         .where(DocumentPermission.document_id == document_id)
     )
-    return [
-        PermissionOut(
-            id=perm.id,
-            document_id=perm.document_id,
-            user_id=perm.user_id,
-            org_id=perm.org_id,
-            user_username=username,
-            user_email=email,
-            org_name=org_name,
-            level=perm.level,
-            granted_by=perm.granted_by,
-            granted_at=perm.granted_at,
-        )
-        for perm, username, email, org_name in result.all()
-    ]
+    perms = result.scalars().all()
+    return await _build_permission_out_list(perms, db)
 
 
 @router.post("/{document_id}/permissions", response_model=PermissionOut, status_code=201)
@@ -512,7 +500,7 @@ async def add_permission(
     target_org: Organization | None = None
     if body.user_id is not None:
         target_user = await db.get(User, body.user_id)
-        if target_user is None:
+        if target_user is None or not target_user.is_active:
             raise HTTPException(status_code=404, detail="Пользователь не найден")
     if body.org_id is not None:
         target_org = await db.get(Organization, body.org_id)
@@ -543,18 +531,7 @@ async def add_permission(
 
     await db.commit()
     await db.refresh(perm)
-    return PermissionOut(
-        id=perm.id,
-        document_id=perm.document_id,
-        user_id=perm.user_id,
-        org_id=perm.org_id,
-        user_username=target_user.username if target_user else None,
-        user_email=target_user.email if target_user else None,
-        org_name=target_org.name if target_org else None,
-        level=perm.level,
-        granted_by=perm.granted_by,
-        granted_at=perm.granted_at,
-    )
+    return (await _build_permission_out_list([perm], db))[0]
 
 
 @router.delete("/{document_id}/permissions/{permission_id}", status_code=204)
@@ -596,6 +573,48 @@ def _delete_qdrant_vectors(document_id: int) -> None:
         )
     except Exception as exc:
         logger.warning("Qdrant vector deletion failed for doc %d: %s", document_id, exc)
+
+
+async def _build_permission_out_list(
+    permissions: list[DocumentPermission],
+    db: AsyncSession,
+) -> list[PermissionOut]:
+    from shared.models import Organization
+
+    user_ids = [p.user_id for p in permissions if p.user_id is not None]
+    org_ids = [p.org_id for p in permissions if p.org_id is not None]
+
+    user_map: dict[int, tuple[str, str]] = {}
+    if user_ids:
+        user_result = await db.execute(
+            select(User.id, User.username, User.email).where(User.id.in_(user_ids))
+        )
+        user_map = {row.id: (row.username, row.email) for row in user_result.all()}
+
+    org_map: dict[int, tuple[str, str]] = {}
+    if org_ids:
+        org_result = await db.execute(
+            select(Organization.id, Organization.name, Organization.slug).where(
+                Organization.id.in_(org_ids)
+            )
+        )
+        org_map = {row.id: (row.name, row.slug) for row in org_result.all()}
+
+    items: list[PermissionOut] = []
+    for permission in permissions:
+        user_info = user_map.get(permission.user_id) if permission.user_id is not None else None
+        org_info = org_map.get(permission.org_id) if permission.org_id is not None else None
+        items.append(
+            PermissionOut.model_validate(permission).model_copy(
+                update={
+                    "user_username": user_info[0] if user_info else None,
+                    "user_email": user_info[1] if user_info else None,
+                    "org_name": org_info[0] if org_info else None,
+                    "org_slug": org_info[1] if org_info else None,
+                }
+            )
+        )
+    return items
 
 
 def _extract_text_preview(file_data: bytes, file_type: str) -> str:

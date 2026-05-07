@@ -8,6 +8,12 @@ export interface Organization {
   created_at: string;
 }
 
+export interface OrganizationLookup {
+  id: number;
+  name: string;
+  slug: string;
+}
+
 export interface OrganizationMember {
   id: number;
   user_id: number;
@@ -37,6 +43,11 @@ export interface AddMemberParams {
 
 export async function getMyOrganizations(): Promise<Organization[]> {
   const response = await api.get<Organization[]>('/organizations/');
+  return response.data;
+}
+
+export async function lookupOrganizations(q: string): Promise<OrganizationLookup[]> {
+  const response = await api.get<OrganizationLookup[]>('/organizations/lookup', { params: { q } });
   return response.data;
 }
 
