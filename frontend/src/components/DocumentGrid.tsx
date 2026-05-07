@@ -37,10 +37,10 @@ const STATUS_LABELS: Record<Document['status'], string> = {
 };
 
 const FILE_TYPE_COLORS: Record<string, string> = {
-  pdf: '#d93025',
-  docx: '#1a73e8',
-  xlsx: '#188038',
-  txt: '#80868b',
+  pdf: 'var(--g-color-line-danger)',
+  docx: 'var(--g-color-line-info)',
+  xlsx: 'var(--g-color-line-positive)',
+  txt: 'var(--g-color-line-generic-accent)',
 };
 
 function formatDate(iso: string): string {

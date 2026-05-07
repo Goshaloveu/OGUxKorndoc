@@ -13,6 +13,7 @@ import App from './App';
 import { ThemeContext } from './hooks/useTheme';
 import type { Theme, AppLang } from './hooks/useTheme';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { setI18nLang } from './i18n';
 
 const LANG_TO_GRAVITY: Record<AppLang, Lang> = {
   ru: Lang.Ru,
@@ -47,6 +48,7 @@ const Root: React.FC = () => {
       lang,
       setLang: (l: AppLang) => {
         localStorage.setItem('lang', l);
+        setI18nLang(l);
         settings
           .loadLocale(l)
           .then(() => {
@@ -84,6 +86,7 @@ const Root: React.FC = () => {
 };
 
 const initLang: AppLang = (localStorage.getItem('lang') as AppLang) || 'ru';
+setI18nLang(initLang);
 
 async function bootstrap() {
   try {

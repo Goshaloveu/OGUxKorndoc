@@ -14,6 +14,7 @@
     "@gravity-ui/aikit": "^1.17.0",
     "@gravity-ui/components": "^4.18.0",
     "@gravity-ui/date-components": "^3.4.0",
+    "@gravity-ui/i18n": "^1.8.0",
     "@gravity-ui/icons": "^2.11.0",
     "@gravity-ui/navigation": "^4.0.14",
     "@gravity-ui/uikit": "^7.4.0",
