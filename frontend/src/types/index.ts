@@ -8,6 +8,12 @@ export interface User {
   last_login?: string | null;
 }
 
+export interface UserLookup {
+  id: number;
+  email: string;
+  username: string;
+}
+
 export interface ApiError {
   detail: string;
 }
@@ -37,7 +43,11 @@ export interface DocumentPermission {
   id: number;
   document_id: number;
   user_id: number | null;
+  user_username: string | null;
+  user_email: string | null;
   org_id: number | null;
+  org_name: string | null;
+  org_slug: string | null;
   level: 'viewer' | 'editor' | 'owner';
   granted_by: number;
   granted_at: string;

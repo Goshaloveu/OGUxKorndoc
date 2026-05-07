@@ -3,6 +3,7 @@ import { ChatContainer } from '@gravity-ui/aikit';
 import '@gravity-ui/aikit/styles';
 import type { TChatMessage, ChatType, TSubmitData, ChatStatus } from '@gravity-ui/aikit';
 import { useAuth } from '../hooks/useAuth';
+import { useTranslation } from '../i18n';
 
 const SYSTEM_PROMPT =
   'You are a helpful assistant for a corporate document management system called KornDoc. ' +
@@ -17,6 +18,8 @@ function genId(): string {
 
 const AIAssistantPage: React.FC = () => {
   const { user } = useAuth();
+  const t = useTranslation('aiPage');
+  const tHome = useTranslation('home');
   const [messages, setMessages] = useState<TChatMessage[]>([]);
   const [status, setStatus] = useState<ChatStatus>('ready');
   const [chatError, setChatError] = useState<Error | null>(null);
@@ -116,7 +119,7 @@ const AIAssistantPage: React.FC = () => {
         setStatus('ready');
         return;
       }
-      const error = err instanceof Error ? err : new Error('Неизвестная ошибка');
+      const error = err instanceof Error ? err : new Error(t('unknownError'));
       setChatError(error);
       setStatus('error');
       setMessages((prev) =>
@@ -124,7 +127,7 @@ const AIAssistantPage: React.FC = () => {
           m.id === assistantId
             ? {
                 ...m,
-                content: `Ошибка: ${error.message}. Пожалуйста, попробуйте снова.`,
+                content: t('errorMessage', { message: error.message }),
                 error: error,
               }
             : m,
@@ -156,25 +159,25 @@ const AIAssistantPage: React.FC = () => {
         showHistory={false}
         showNewChat={false}
         welcomeConfig={{
-          title: 'KornDoc AI Ассистент',
-          description: `Привет, ${user?.username ?? 'пользователь'}! Задайте вопрос о документах или попросите помощи.`,
+          title: t('title'),
+          description: t('welcome', { name: user?.username ?? tHome('fallbackUser') }),
           suggestions: [
-            { title: 'Как найти документ?' },
-            { title: 'Как загрузить файл?' },
-            { title: 'Как поделиться доступом к документу?' },
-            { title: 'Какие форматы файлов поддерживаются?' },
+            { title: t('suggestFind') },
+            { title: t('suggestUpload') },
+            { title: t('suggestShare') },
+            { title: t('suggestFormats') },
           ],
         }}
         i18nConfig={{
           promptInput: {
-            placeholder: 'Напишите вопрос или задачу...',
+            placeholder: t('placeholder'),
           },
           submitButton: {
-            sendTooltip: 'Отправить',
-            cancelTooltip: 'Остановить',
+            sendTooltip: t('send'),
+            cancelTooltip: t('cancel'),
           },
           emptyState: {
-            suggestionsTitle: 'Попробуйте спросить:',
+            suggestionsTitle: t('suggestionsTitle'),
           },
         }}
       />

@@ -3,28 +3,14 @@ import { Button, Card, Divider, Switch, Text } from '@gravity-ui/uikit';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useThemeContext } from '../hooks/useTheme';
 import type { NotifCategory } from '../contexts/NotificationContext';
-
-const CATEGORY_LABELS: Record<NotifCategory, string> = {
-  upload: 'Загрузка файлов',
-  permission: 'Права доступа',
-  admin: 'Администрирование',
-  settings: 'Настройки',
-  document: 'Документы',
-};
-
-const CATEGORY_DESCRIPTIONS: Record<NotifCategory, string> = {
-  upload: 'Загрузка, индексация и ошибки обработки файлов',
-  permission: 'Выдача и отзыв прав доступа к документам',
-  admin: 'Создание пользователей, переиндексация и другие админ-действия',
-  settings: 'Сохранение настроек профиля и системы',
-  document: 'Удаление документов',
-};
+import { useTranslation } from '../i18n';
 
 const CATEGORIES: NotifCategory[] = ['upload', 'permission', 'admin', 'settings', 'document'];
 
 const SettingsPage: React.FC = () => {
   const { categorySettings, updateCategorySettings, addNotification } = useNotifications();
   const { theme, setTheme } = useThemeContext();
+  const t = useTranslation('settingsPage');
 
   const [localSettings, setLocalSettings] = useState({ ...categorySettings });
   const [localTheme, setLocalTheme] = useState(theme);
@@ -40,7 +26,7 @@ const SettingsPage: React.FC = () => {
     setTheme(localTheme);
     setDirty(false);
     // Fire notification (uses current settings, so 'settings' category must be enabled)
-    addNotification('success', 'settings', 'Настройки сохранены');
+    addNotification('success', 'settings', t('saved'));
   };
 
   const handleReset = () => {
@@ -61,18 +47,18 @@ const SettingsPage: React.FC = () => {
     >
       <div>
         <Text variant="display-1" as="h1" style={{ marginBottom: '8px' }}>
-          Настройки
+          {t('title')}
         </Text>
       </div>
 
       {/* Display */}
       <Card view="outlined" style={{ padding: '20px' }}>
-        <Text variant="subheader-2" style={{ marginBottom: '16px' }}>
-          Отображение
+        <Text variant="subheader-2">
+          {t('display')}
         </Text>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', marginTop: 16 }}>
           <div>
-            <Text variant="body-2">Тёмная тема</Text>
+            <Text variant="body-2">{t('darkTheme')}</Text>
           </div>
           <Switch
             checked={localTheme === 'dark'}
@@ -86,40 +72,45 @@ const SettingsPage: React.FC = () => {
 
       {/* Notifications */}
       <Card view="outlined" style={{ padding: '20px' }}>
-        <Text variant="subheader-2" style={{ marginBottom: '8px' }}>
-          Уведомления
+        <Text variant="subheader-2">
+          {t('notifications')}
         </Text>
-        <Text variant="body-2" color="secondary" style={{ marginBottom: '20px' }}>
-          Категории событий, о которых вы хотите получать уведомления в колокольчике
-        </Text>
-
-        {CATEGORIES.map((cat, idx) => (
-          <React.Fragment key={cat}>
-            {idx > 0 && <Divider style={{ margin: '12px 0' }} />}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <Text variant="body-2">{CATEGORY_LABELS[cat]}</Text>
-                <Text variant="caption-1" color="secondary" style={{ display: 'block', marginTop: 2 }}>
-                  {CATEGORY_DESCRIPTIONS[cat]}
-                </Text>
+        <div style={{ display: 'flex', flexDirection: 'column', marginTop: 16 }}>
+          {CATEGORIES.map((cat, idx) => (
+            <React.Fragment key={cat}>
+              {idx > 0 && <Divider style={{ margin: '12px 0' }} />}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '16px',
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <Text variant="body-2">{t(`category.${cat}`)}</Text>
+                  <Text variant="caption-1" color="secondary" style={{ display: 'block', marginTop: 2 }}>
+                    {t(`categoryDescription.${cat}`)}
+                  </Text>
+                </div>
+                <Switch
+                  checked={localSettings[cat]}
+                  onUpdate={(val) => handleToggle(cat, val)}
+                />
               </div>
-              <Switch
-                checked={localSettings[cat]}
-                onUpdate={(val) => handleToggle(cat, val)}
-              />
-            </div>
-          </React.Fragment>
-        ))}
+            </React.Fragment>
+          ))}
+        </div>
       </Card>
 
       {/* Save */}
       <div style={{ display: 'flex', gap: '12px' }}>
         <Button view="action" size="l" disabled={!dirty} onClick={handleSave}>
-          Сохранить настройки
+          {t('saveSettings')}
         </Button>
         {dirty && (
           <Button view="outlined" size="l" onClick={handleReset}>
-            Отменить
+            {t('cancelChanges')}
           </Button>
         )}
       </div>

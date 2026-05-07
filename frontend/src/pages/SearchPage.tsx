@@ -16,19 +16,22 @@ import { Magnifier, Xmark } from '@gravity-ui/icons';
 import { searchDocuments } from '../api/search';
 import SearchResultCard from '../components/SearchResultCard';
 import type { SearchFilters, SearchResponse } from '../types';
-
-const FILE_TYPE_OPTIONS = [
-  { value: '', content: 'Все типы' },
-  { value: 'pdf', content: 'PDF' },
-  { value: 'docx', content: 'DOCX' },
-  { value: 'xlsx', content: 'XLSX' },
-  { value: 'txt', content: 'TXT' },
-];
+import { useTranslation } from '../i18n';
 
 const SearchPage: React.FC = () => {
+  const t = useTranslation('searchPage');
+  const tApp = useTranslation('app');
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<SearchFilters>({});
   const [lastResponse, setLastResponse] = useState<SearchResponse | null>(null);
+
+  const fileTypeOptions = [
+    { value: '', content: tApp('allTypes') },
+    { value: 'pdf', content: 'PDF' },
+    { value: 'docx', content: 'DOCX' },
+    { value: 'xlsx', content: 'XLSX' },
+    { value: 'txt', content: 'TXT' },
+  ];
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -43,8 +46,8 @@ const SearchPage: React.FC = () => {
     onError: (err: { response?: { data?: { detail?: string } } }) => {
       toaster.add({
         name: 'search-error',
-        title: 'Ошибка поиска',
-        content: err.response?.data?.detail ?? 'Не удалось выполнить поиск',
+        title: t('toastErrorTitle'),
+        content: err.response?.data?.detail ?? t('toastErrorContent'),
         theme: 'danger',
         autoHiding: 4000,
       });
@@ -68,7 +71,7 @@ const SearchPage: React.FC = () => {
 
   return (
     <div style={{ maxWidth: 800, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <Text variant="header-1">Поиск документов</Text>
+      <Text variant="header-1">{t('title')}</Text>
 
       {/* Search bar */}
       <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -77,7 +80,7 @@ const SearchPage: React.FC = () => {
           // view="clear"
           type="search"
           hasClear
-          placeholder="Введите текст или отрывок из документа..."
+          placeholder={t('placeholder')}
           value={query}
           onUpdate={setQuery}
           onKeyDown={handleKeyDown}
@@ -96,7 +99,7 @@ const SearchPage: React.FC = () => {
           onClick={handleSearch}
           disabled={!query.trim()}
         >
-          Найти
+          {t('submit')}
         </Button>
       </div>
 
@@ -113,18 +116,18 @@ const SearchPage: React.FC = () => {
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 130 }}>
-          <Text variant="caption-2" color="secondary">Тип файла</Text>
+          <Text variant="caption-2" color="secondary">{t('fileType')}</Text>
           <Select
             size="m"
             value={filters.file_type ? [filters.file_type] : ['']}
             onUpdate={(v) => setFilters({ ...filters, file_type: v[0] || undefined })}
-            options={FILE_TYPE_OPTIONS}
+            options={fileTypeOptions}
             width={130}
           />
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 140 }}>
-          <Text variant="caption-2" color="secondary">С даты</Text>
+          <Text variant="caption-2" color="secondary">{t('dateFrom')}</Text>
           <DatePicker
             size="m"
             format="DD.MM.YYYY"
@@ -137,7 +140,7 @@ const SearchPage: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 140 }}>
-          <Text variant="caption-2" color="secondary">По дату</Text>
+          <Text variant="caption-2" color="secondary">{t('dateTo')}</Text>
           <DatePicker
             size="m"
             format="DD.MM.YYYY"
@@ -152,14 +155,14 @@ const SearchPage: React.FC = () => {
         {hasFilters && (
           <Button view="flat" size="s" onClick={clearFilters}>
             <Xmark width={14} height={14} />
-            Сбросить
+            {tApp('reset')}
           </Button>
         )}
       </div>
 
       {/* Error state */}
       {mutation.isError && (
-        <Alert theme="danger" message="Ошибка выполнения поиска. Попробуйте снова." />
+        <Alert theme="danger" message={t('errorMessage')} />
       )}
 
       {/* Loading skeletons */}
@@ -175,13 +178,13 @@ const SearchPage: React.FC = () => {
       {!mutation.isPending && lastResponse !== null && (
         <>
           <Text variant="body-2" color="secondary">
-            Найдено: {lastResponse.total} документов ({lastResponse.query_time_ms} мс)
+            {t('results', { total: lastResponse.total, time: lastResponse.query_time_ms })}
           </Text>
 
           {lastResponse.results.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '2rem 0' }}>
               <Text variant="body-1" color="secondary">
-                Ничего не найдено. Попробуйте изменить запрос или фильтры.
+                {t('empty')}
               </Text>
             </div>
           ) : (
