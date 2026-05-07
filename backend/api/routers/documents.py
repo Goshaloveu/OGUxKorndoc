@@ -11,7 +11,14 @@ from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict
 from shared.database import get_db
 from shared.minio_client import delete_file, download_file, generate_presigned_url, upload_file
-from shared.models import AuditLog, Document, DocumentPermission, OrganizationMember, User
+from shared.models import (
+    AuditLog,
+    Document,
+    DocumentPermission,
+    Notification,
+    OrganizationMember,
+    User,
+)
 from shared.security import get_current_user
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -184,6 +191,15 @@ async def upload_document(
         granted_by=current_user.id,
     )
     db.add(perm)
+    _add_notification(
+        db,
+        user_id=current_user.id,
+        type_="success",
+        title="Документ загружен",
+        message=f'Документ "{document.title}" загружен и поставлен в очередь обработки.',
+        resource_type="document",
+        resource_id=str(document.id),
+    )
     await db.commit()
     await db.refresh(document)
 
@@ -262,10 +278,7 @@ async def list_documents(
         uname_result = await db.execute(
             select(User.id, User.username).where(User.id.in_(uploader_ids))
         )
-        username_map = {
-            row["id"]: row["username"]
-            for row in uname_result.mappings().all()
-        }
+        username_map = {row["id"]: row["username"] for row in uname_result.mappings().all()}
 
     items = [
         DocumentOut.model_validate(d).model_copy(
@@ -476,7 +489,7 @@ async def add_permission(
     db: AsyncSession = Depends(get_db),
 ):
     """Grant access to a document. Requires owner access."""
-    await check_document_access(document_id, "owner", current_user, db)
+    doc = await check_document_access(document_id, "owner", current_user, db)
 
     if body.level not in ("viewer", "editor", "owner"):
         raise HTTPException(status_code=400, detail="Уровень должен быть viewer, editor или owner")
@@ -506,6 +519,28 @@ async def add_permission(
         },
     )
     db.add(audit)
+
+    recipient_ids: set[int] = set()
+    if body.user_id is not None:
+        recipient_ids.add(body.user_id)
+    if body.org_id is not None:
+        member_result = await db.execute(
+            select(OrganizationMember.user_id).where(OrganizationMember.org_id == body.org_id)
+        )
+        recipient_ids.update(row[0] for row in member_result.all())
+
+    for recipient_id in recipient_ids:
+        if recipient_id == current_user.id:
+            continue
+        _add_notification(
+            db,
+            user_id=recipient_id,
+            type_="info",
+            title="Вам открыли доступ",
+            message=f'Документ "{doc.title}" доступен с уровнем {body.level}.',
+            resource_type="document",
+            resource_id=str(document_id),
+        )
 
     await db.commit()
     await db.refresh(perm)
@@ -591,3 +626,25 @@ def _queue_process_task(document_id: int) -> None:
     except Exception as exc:
         # Non-fatal: document stays in 'pending' state and can be reindexed later
         logger.warning("Failed to queue processing task for doc %d: %s", document_id, exc)
+
+
+def _add_notification(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    type_: str,
+    title: str,
+    message: str,
+    resource_type: str | None = None,
+    resource_id: str | None = None,
+) -> None:
+    db.add(
+        Notification(
+            user_id=user_id,
+            type=type_,
+            title=title,
+            message=message,
+            resource_type=resource_type,
+            resource_id=resource_id,
+        )
+    )
