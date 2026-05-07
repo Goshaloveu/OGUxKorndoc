@@ -7,9 +7,10 @@ from fastembed import SparseTextEmbedding
 from qdrant_client import QdrantClient
 from qdrant_client.http.exceptions import UnexpectedResponse
 from qdrant_client.http.models import Distance, SparseIndexParams, SparseVectorParams, VectorParams
-from routers import admin, auth, chat, documents, organizations, profile, search, users
+from routers import admin, auth, chat, documents, faq, organizations, profile, search, users
 from sentence_transformers import SentenceTransformer
 from shared.config import settings
+from shared.llm import ChatLLM
 
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper(), logging.INFO),
@@ -73,7 +74,9 @@ async def lifespan(app: FastAPI):
     logger.info("Sparse embedding model loaded")
 
     _ensure_qdrant_collection()
+    app.state.llm = ChatLLM()
     yield
+    await app.state.llm.close()
     logger.info("Shutting down")
 
 
@@ -94,6 +97,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(documents.router)
 app.include_router(search.router)
+app.include_router(faq.router)
 app.include_router(admin.router)
 app.include_router(profile.router)
 app.include_router(organizations.router)

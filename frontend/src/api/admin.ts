@@ -269,3 +269,53 @@ export async function addAdminDocPermission(
 export async function removeAdminDocPermission(docId: number, permId: number): Promise<void> {
   await api.delete(`/admin/documents/${docId}/permissions/${permId}`);
 }
+
+// ---------------------------------------------------------------------------
+// FAQ
+// ---------------------------------------------------------------------------
+
+export interface AdminFAQItem {
+  id: number;
+  question: string;
+  answer: string;
+  order: number;
+  is_published: boolean;
+  created_by: number;
+  created_by_username: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminFAQListResponse {
+  items: AdminFAQItem[];
+  total: number;
+}
+
+export interface FAQItemPayload {
+  question: string;
+  answer: string;
+  order: number;
+  is_published: boolean;
+}
+
+export async function getAdminFAQItems(): Promise<AdminFAQListResponse> {
+  const response = await api.get<AdminFAQListResponse>('/admin/faq');
+  return response.data;
+}
+
+export async function createAdminFAQItem(params: FAQItemPayload): Promise<AdminFAQItem> {
+  const response = await api.post<AdminFAQItem>('/admin/faq', params);
+  return response.data;
+}
+
+export async function updateAdminFAQItem(
+  id: number,
+  params: Partial<FAQItemPayload>,
+): Promise<AdminFAQItem> {
+  const response = await api.patch<AdminFAQItem>(`/admin/faq/${id}`, params);
+  return response.data;
+}
+
+export async function deleteAdminFAQItem(id: number): Promise<void> {
+  await api.delete(`/admin/faq/${id}`);
+}
