@@ -194,6 +194,20 @@ async def _faq_out(item: FAQItem, db: AsyncSession) -> FAQItemOut:
     )
 
 
+def _queue_faq_index_task(faq_id: int) -> None:
+    """Send the FAQ indexing task to the Celery broker."""
+    try:
+        from celery_client import celery_app
+
+        celery_app.send_task(
+            "worker.tasks.index_faq.index_faq_entry",
+            args=[faq_id],
+        )
+        logger.info("Queued FAQ indexing task for FAQ %d", faq_id)
+    except Exception as exc:
+        logger.warning("Failed to queue FAQ indexing task for FAQ %d: %s", faq_id, exc)
+
+
 @router.get("/faq", response_model=FAQItemListOut)
 async def list_faq_items(
     admin: User = Depends(require_admin),
@@ -235,6 +249,7 @@ async def create_faq_item(
     )
     await db.commit()
     await db.refresh(item)
+    _queue_faq_index_task(item.id)
     return await _faq_out(item, db)
 
 
@@ -270,6 +285,7 @@ async def update_faq_item(
     )
     await db.commit()
     await db.refresh(item)
+    _queue_faq_index_task(item.id)
     return await _faq_out(item, db)
 
 
@@ -295,6 +311,7 @@ async def delete_faq_item(
     )
     await db.delete(item)
     await db.commit()
+    _queue_faq_index_task(faq_id)
 
 
 @router.get("/users", response_model=UserListOut)

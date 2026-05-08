@@ -20,14 +20,20 @@ logger = logging.getLogger(__name__)
 
 
 def _ensure_qdrant_collection() -> None:
-    """Create or validate the hybrid-search Qdrant collection."""
+    """Create or validate Qdrant collections used by search."""
     client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
+    _ensure_hybrid_collection(client, settings.qdrant_collection, "document search")
+    _ensure_hybrid_collection(client, settings.qdrant_faq_collection, "FAQ search")
+
+
+def _ensure_hybrid_collection(client: QdrantClient, collection_name: str, purpose: str) -> None:
+    """Create or validate one dense+sparse hybrid-search collection."""
     existing = [c.name for c in client.get_collections().collections]
-    if settings.qdrant_collection not in existing:
-        _create_qdrant_collection(client)
+    if collection_name not in existing:
+        _create_qdrant_collection(client, collection_name, purpose)
         return
 
-    info = client.get_collection(settings.qdrant_collection)
+    info = client.get_collection(collection_name)
     params = info.config.params
     vectors_config = params.vectors
     sparse_vectors_config = params.sparse_vectors or {}
@@ -38,20 +44,28 @@ def _ensure_qdrant_collection() -> None:
     if dense_config is None or sparse_config is None:
         _handle_qdrant_schema_mismatch(
             client,
+            collection_name,
+            purpose,
             "must use named vectors 'dense' and 'sparse' for hybrid search",
         )
         return
     if dense_config.size != settings.embedding_dim:
         _handle_qdrant_schema_mismatch(
             client,
+            collection_name,
+            purpose,
             f"dense vector size is {dense_config.size}, expected {settings.embedding_dim}",
         )
 
 
-def _create_qdrant_collection(client: QdrantClient) -> None:
+def _create_qdrant_collection(
+    client: QdrantClient,
+    collection_name: str,
+    purpose: str,
+) -> None:
     try:
         client.create_collection(
-            collection_name=settings.qdrant_collection,
+            collection_name=collection_name,
             vectors_config={
                 "dense": VectorParams(size=settings.embedding_dim, distance=Distance.COSINE)
             },
@@ -59,14 +73,19 @@ def _create_qdrant_collection(client: QdrantClient) -> None:
                 "sparse": SparseVectorParams(index=SparseIndexParams(on_disk=False))
             },
         )
-        logger.info("Created Qdrant collection '%s' for hybrid search", settings.qdrant_collection)
+        logger.info("Created Qdrant collection '%s' for %s", collection_name, purpose)
     except UnexpectedResponse as exc:
         if exc.status_code != 409:
             raise
 
 
-def _handle_qdrant_schema_mismatch(client: QdrantClient, reason: str) -> None:
-    message = f"Qdrant collection '{settings.qdrant_collection}' {reason}."
+def _handle_qdrant_schema_mismatch(
+    client: QdrantClient,
+    collection_name: str,
+    purpose: str,
+    reason: str,
+) -> None:
+    message = f"Qdrant collection '{collection_name}' {reason}."
     if not settings.allow_qdrant_recreate_on_mismatch:
         raise RuntimeError(f"{message} Recreate it and run reindex_all_documents.")
 
@@ -75,8 +94,8 @@ def _handle_qdrant_schema_mismatch(client: QdrantClient, reason: str) -> None:
         message,
         settings.environment,
     )
-    client.delete_collection(collection_name=settings.qdrant_collection)
-    _create_qdrant_collection(client)
+    client.delete_collection(collection_name=collection_name)
+    _create_qdrant_collection(client, collection_name, purpose)
 
 
 @asynccontextmanager
