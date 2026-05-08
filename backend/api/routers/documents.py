@@ -1,0 +1,657 @@
+import asyncio
+import io
+import json
+import logging
+import uuid
+from datetime import datetime
+
+from dependencies import check_document_access
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
+from fastapi.responses import Response
+from pydantic import BaseModel, ConfigDict
+from shared.database import get_db
+from shared.minio_client import delete_file, download_file, generate_presigned_url, upload_file
+from shared.models import (
+    AuditLog,
+    Document,
+    DocumentPermission,
+    Organization,
+    OrganizationMember,
+    User,
+)
+from shared.security import get_current_user
+from sqlalchemy import func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api/documents", tags=["documents"])
+
+ALLOWED_EXTENSIONS = {"pdf", "docx", "xlsx", "txt"}
+CONTENT_TYPES: dict[str, str] = {
+    "pdf": "application/pdf",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "txt": "text/plain",
+}
+MAX_FILE_SIZE = 52_428_800  # 50 MB
+
+
+# ---------------------------------------------------------------------------
+# Response schemas
+# ---------------------------------------------------------------------------
+
+
+class DocumentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    title: str
+    filename: str
+    file_type: str
+    file_size: int
+    folder_path: str
+    status: str
+    error_message: str | None
+    uploaded_by: int
+    uploaded_by_username: str | None = None
+    org_id: int | None
+    uploaded_at: datetime
+    updated_at: datetime
+    indexed_at: datetime | None
+    page_count: int | None
+    chunk_count: int | None
+    tags: list
+
+
+class DocumentStatusOut(BaseModel):
+    id: int
+    status: str
+    error_message: str | None
+    chunk_count: int | None
+
+
+class DocumentListOut(BaseModel):
+    items: list[DocumentOut]
+    total: int
+    page: int
+    limit: int
+
+
+class DocumentPreviewOut(BaseModel):
+    text: str
+    page_count: int | None
+
+
+class PresignedUrlOut(BaseModel):
+    url: str
+    expires_in: int
+
+
+class UpdateDocumentRequest(BaseModel):
+    title: str | None = None
+    tags: list[str] | None = None
+    folder_path: str | None = None
+
+
+class PermissionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    document_id: int
+    user_id: int | None
+    user_username: str | None = None
+    user_email: str | None = None
+    org_id: int | None
+    org_name: str | None = None
+    org_slug: str | None = None
+    level: str
+    granted_by: int
+    granted_at: datetime
+
+
+class AddPermissionRequest(BaseModel):
+    user_id: int | None = None
+    org_id: int | None = None
+    level: str  # "viewer" | "editor" | "owner"
+
+
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.post("/upload", response_model=DocumentOut, status_code=status.HTTP_201_CREATED)
+async def upload_document(
+    request: Request,
+    file: UploadFile = File(...),
+    title: str | None = Form(None),
+    tags: str | None = Form(None),
+    folder_path: str = Form("/"),
+    org_id: int | None = Form(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Upload a document: validate, store in MinIO, create DB record, queue processing."""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Имя файла не указано")
+
+    file_ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+    if file_ext not in ALLOWED_EXTENSIONS:
+        allowed = ", ".join(sorted(ALLOWED_EXTENSIONS))
+        raise HTTPException(
+            status_code=400,
+            detail=f"Неподдерживаемый тип файла. Разрешены: {allowed}",
+        )
+
+    file_data = await file.read()
+    if len(file_data) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail="Файл превышает 50 MB")
+
+    # Parse tags: accept JSON array or comma-separated string
+    parsed_tags: list[str] = []
+    if tags:
+        try:
+            parsed_tags = json.loads(tags)
+            if not isinstance(parsed_tags, list):
+                parsed_tags = []
+        except (json.JSONDecodeError, ValueError):
+            parsed_tags = [t.strip() for t in tags.split(",") if t.strip()]
+
+    # Generate unique path in MinIO to avoid collisions
+    minio_path = f"{uuid.uuid4()}/{file.filename}"
+    content_type = CONTENT_TYPES.get(file_ext, "application/octet-stream")
+
+    # Upload to MinIO in thread pool (synchronous boto3 call)
+    try:
+        await asyncio.get_running_loop().run_in_executor(
+            None, upload_file, file_data, minio_path, content_type
+        )
+    except Exception as exc:
+        logger.error("MinIO upload failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Ошибка загрузки файла в хранилище") from exc
+
+    doc_title = title or file.filename
+    document = Document(
+        title=doc_title,
+        filename=file.filename,
+        file_type=file_ext,
+        file_size=len(file_data),
+        minio_path=minio_path,
+        folder_path=folder_path,
+        status="pending",
+        uploaded_by=current_user.id,
+        org_id=org_id,
+        tags=parsed_tags,
+    )
+    db.add(document)
+    await db.flush()  # assigns document.id
+
+    # Uploader automatically gets owner permission
+    perm = DocumentPermission(
+        document_id=document.id,
+        user_id=current_user.id,
+        org_id=None,
+        level="owner",
+        granted_by=current_user.id,
+    )
+    db.add(perm)
+    await db.commit()
+    await db.refresh(document)
+
+    # Queue Celery processing task
+    _queue_process_task(document.id)
+
+    return DocumentOut.model_validate(document)
+
+
+@router.get("/", response_model=DocumentListOut)
+async def list_documents(
+    page: int = 1,
+    limit: int = 20,
+    status: str | None = None,
+    file_type: str | None = None,
+    folder_path: str | None = None,
+    org_id: int | None = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List documents accessible to the current user with optional filters."""
+    query = select(Document)
+
+    if current_user.role != "admin":
+        # Build access filter: own docs + org docs + explicit permissions
+        org_result = await db.execute(
+            select(OrganizationMember.org_id).where(OrganizationMember.user_id == current_user.id)
+        )
+        user_org_ids = [row[0] for row in org_result.all()]
+
+        perm_result = await db.execute(
+            select(DocumentPermission.document_id).where(
+                DocumentPermission.user_id == current_user.id
+            )
+        )
+        accessible_ids = [row[0] for row in perm_result.all()]
+
+        if user_org_ids:
+            org_perm_result = await db.execute(
+                select(DocumentPermission.document_id).where(
+                    DocumentPermission.org_id.in_(user_org_ids)
+                )
+            )
+            accessible_ids += [row[0] for row in org_perm_result.all()]
+
+        conditions = [Document.uploaded_by == current_user.id]
+        if user_org_ids:
+            conditions.append(Document.org_id.in_(user_org_ids))
+        if accessible_ids:
+            conditions.append(Document.id.in_(accessible_ids))
+
+        query = query.where(or_(*conditions))
+
+    if status:
+        query = query.where(Document.status == status)
+    if file_type:
+        query = query.where(Document.file_type == file_type)
+    if folder_path:
+        query = query.where(Document.folder_path == folder_path)
+    if org_id is not None:
+        query = query.where(Document.org_id == org_id)
+
+    count_result = await db.execute(select(func.count()).select_from(query.subquery()))
+    total = count_result.scalar() or 0
+
+    offset = (page - 1) * limit
+    result = await db.execute(
+        query.order_by(Document.uploaded_at.desc()).offset(offset).limit(limit)
+    )
+    documents = result.scalars().all()
+
+    # Enrich with uploader usernames in one batch query
+    uploader_ids = list({d.uploaded_by for d in documents})
+    username_map: dict[int, str] = {}
+    if uploader_ids:
+        uname_result = await db.execute(
+            select(User.id, User.username).where(User.id.in_(uploader_ids))
+        )
+        username_map = {row["id"]: row["username"] for row in uname_result.mappings().all()}
+
+    items = [
+        DocumentOut.model_validate(d).model_copy(
+            update={"uploaded_by_username": username_map.get(d.uploaded_by)}
+        )
+        for d in documents
+    ]
+
+    return DocumentListOut(items=items, total=total, page=page, limit=limit)
+
+
+@router.get("/{document_id}", response_model=DocumentOut)
+async def get_document(
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get document metadata. Requires at least viewer access."""
+    doc = await check_document_access(document_id, "viewer", current_user, db)
+    return DocumentOut.model_validate(doc)
+
+
+@router.get("/{document_id}/download")
+async def download_document(
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Download the raw file from MinIO. Requires viewer access."""
+    doc = await check_document_access(document_id, "viewer", current_user, db)
+
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="download",
+        resource_type="document",
+        resource_id=str(document_id),
+        details={"filename": doc.filename},
+    )
+    db.add(audit)
+
+    try:
+        file_bytes = await asyncio.get_running_loop().run_in_executor(
+            None, download_file, doc.minio_path
+        )
+    except Exception as exc:
+        logger.error("MinIO download failed for %s: %s", doc.minio_path, exc)
+        raise HTTPException(status_code=500, detail="Ошибка получения файла из хранилища") from exc
+
+    media_type = CONTENT_TYPES.get(doc.file_type, "application/octet-stream")
+    return Response(
+        content=file_bytes,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{doc.filename}"'},
+    )
+
+
+@router.get("/{document_id}/status", response_model=DocumentStatusOut)
+async def get_document_status(
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get processing status of a document."""
+    doc = await check_document_access(document_id, "viewer", current_user, db)
+    return DocumentStatusOut(
+        id=doc.id,
+        status=doc.status,
+        error_message=doc.error_message,
+        chunk_count=doc.chunk_count,
+    )
+
+
+@router.get("/{document_id}/preview", response_model=DocumentPreviewOut)
+async def get_document_preview(
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return the first 3000 characters of extracted text. Requires viewer access."""
+    doc = await check_document_access(document_id, "viewer", current_user, db)
+
+    try:
+        file_bytes = await asyncio.get_running_loop().run_in_executor(
+            None, download_file, doc.minio_path
+        )
+        text = await asyncio.get_running_loop().run_in_executor(
+            None, _extract_text_preview, file_bytes, doc.file_type
+        )
+    except Exception as exc:
+        logger.error("Preview extraction failed for doc %d: %s", document_id, exc)
+        raise HTTPException(status_code=500, detail="Ошибка извлечения текста") from exc
+
+    return DocumentPreviewOut(text=text[:3000], page_count=doc.page_count)
+
+
+@router.get("/{document_id}/presigned-url", response_model=PresignedUrlOut)
+async def get_presigned_url(
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return a short-lived presigned URL for direct browser download/preview (viewer+).
+
+    The URL is valid for 5 minutes and bypasses the API auth header requirement,
+    making it usable in iframes and <a href> links.
+    """
+    doc = await check_document_access(document_id, "viewer", current_user, db)
+
+    try:
+        url = await asyncio.get_running_loop().run_in_executor(
+            None, generate_presigned_url, doc.minio_path, 300
+        )
+    except Exception as exc:
+        logger.error("Failed to generate presigned URL for doc %d: %s", document_id, exc)
+        raise HTTPException(status_code=500, detail="Ошибка генерации URL") from exc
+
+    return PresignedUrlOut(url=url, expires_in=300)
+
+
+# ---------------------------------------------------------------------------
+# PATCH / DELETE document
+# ---------------------------------------------------------------------------
+
+
+@router.patch("/{document_id}", response_model=DocumentOut)
+async def update_document(
+    document_id: int,
+    body: UpdateDocumentRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update document metadata (title, tags, folder_path). Requires editor access."""
+    doc = await check_document_access(document_id, "editor", current_user, db)
+
+    if body.title is not None:
+        doc.title = body.title
+    if body.tags is not None:
+        doc.tags = body.tags
+    if body.folder_path is not None:
+        doc.folder_path = body.folder_path
+
+    await db.commit()
+    await db.refresh(doc)
+    return DocumentOut.model_validate(doc)
+
+
+@router.delete("/{document_id}", status_code=204)
+async def delete_document_endpoint(
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a document (owner or admin). Removes file from MinIO and vectors from Qdrant."""
+    doc = await check_document_access(document_id, "owner", current_user, db)
+
+    # Delete from MinIO
+    try:
+        await asyncio.get_running_loop().run_in_executor(None, delete_file, doc.minio_path)
+    except Exception as exc:
+        logger.warning("Failed to delete MinIO object %s: %s", doc.minio_path, exc)
+
+    # Delete vectors from Qdrant
+    try:
+        await asyncio.get_running_loop().run_in_executor(None, _delete_qdrant_vectors, document_id)
+    except Exception as exc:
+        logger.warning("Failed to delete Qdrant vectors for doc %d: %s", document_id, exc)
+
+    # Audit log
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="delete",
+        resource_type="document",
+        resource_id=str(document_id),
+        details={"title": doc.title, "filename": doc.filename},
+    )
+    db.add(audit)
+
+    await db.delete(doc)
+    await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Permissions endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{document_id}/permissions", response_model=list[PermissionOut])
+async def list_permissions(
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all permissions for a document. Requires owner access."""
+    await check_document_access(document_id, "owner", current_user, db)
+
+    result = await db.execute(
+        select(DocumentPermission, User.username, User.email, Organization.name)
+        .outerjoin(User, User.id == DocumentPermission.user_id)
+        .outerjoin(Organization, Organization.id == DocumentPermission.org_id)
+        .where(DocumentPermission.document_id == document_id)
+    )
+    perms = result.scalars().all()
+    return await _build_permission_out_list(perms, db)
+
+
+@router.post("/{document_id}/permissions", response_model=PermissionOut, status_code=201)
+async def add_permission(
+    document_id: int,
+    body: AddPermissionRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Grant access to a document. Requires owner access."""
+    await check_document_access(document_id, "owner", current_user, db)
+
+    if body.level not in ("viewer", "editor", "owner"):
+        raise HTTPException(status_code=400, detail="Уровень должен быть viewer, editor или owner")
+
+    # Exactly one of user_id/org_id must be set
+    if (body.user_id is None) == (body.org_id is None):
+        raise HTTPException(status_code=400, detail="Укажите ровно одно из: user_id или org_id")
+
+    target_user: User | None = None
+    target_org: Organization | None = None
+    if body.user_id is not None:
+        target_user = await db.get(User, body.user_id)
+        if target_user is None or not target_user.is_active:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+    if body.org_id is not None:
+        target_org = await db.get(Organization, body.org_id)
+        if target_org is None:
+            raise HTTPException(status_code=404, detail="Организация не найдена")
+
+    perm = DocumentPermission(
+        document_id=document_id,
+        user_id=body.user_id,
+        org_id=body.org_id,
+        level=body.level,
+        granted_by=current_user.id,
+    )
+    db.add(perm)
+
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="share",
+        resource_type="document",
+        resource_id=str(document_id),
+        details={
+            "target_user_id": body.user_id,
+            "target_org_id": body.org_id,
+            "level": body.level,
+        },
+    )
+    db.add(audit)
+
+    await db.commit()
+    await db.refresh(perm)
+    return (await _build_permission_out_list([perm], db))[0]
+
+
+@router.delete("/{document_id}/permissions/{permission_id}", status_code=204)
+async def remove_permission(
+    document_id: int,
+    permission_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Revoke a permission. Requires owner access."""
+    await check_document_access(document_id, "owner", current_user, db)
+
+    perm = await db.get(DocumentPermission, permission_id)
+    if perm is None or perm.document_id != document_id:
+        raise HTTPException(status_code=404, detail="Разрешение не найдено")
+
+    await db.delete(perm)
+    await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _delete_qdrant_vectors(document_id: int) -> None:
+    """Delete all vectors associated with a document from Qdrant."""
+    try:
+        from qdrant_client import QdrantClient
+        from qdrant_client.models import FieldCondition, Filter, MatchValue
+        from shared.config import settings as s
+
+        client = QdrantClient(host=s.qdrant_host, port=s.qdrant_port, timeout=10)
+        client.delete(
+            collection_name=s.qdrant_collection,
+            points_selector=Filter(
+                must=[FieldCondition(key="document_id", match=MatchValue(value=document_id))]
+            ),
+        )
+    except Exception as exc:
+        logger.warning("Qdrant vector deletion failed for doc %d: %s", document_id, exc)
+
+
+async def _build_permission_out_list(
+    permissions: list[DocumentPermission],
+    db: AsyncSession,
+) -> list[PermissionOut]:
+    from shared.models import Organization
+
+    user_ids = [p.user_id for p in permissions if p.user_id is not None]
+    org_ids = [p.org_id for p in permissions if p.org_id is not None]
+
+    user_map: dict[int, tuple[str, str]] = {}
+    if user_ids:
+        user_result = await db.execute(
+            select(User.id, User.username, User.email).where(User.id.in_(user_ids))
+        )
+        user_map = {row.id: (row.username, row.email) for row in user_result.all()}
+
+    org_map: dict[int, tuple[str, str]] = {}
+    if org_ids:
+        org_result = await db.execute(
+            select(Organization.id, Organization.name, Organization.slug).where(
+                Organization.id.in_(org_ids)
+            )
+        )
+        org_map = {row.id: (row.name, row.slug) for row in org_result.all()}
+
+    items: list[PermissionOut] = []
+    for permission in permissions:
+        user_info = user_map.get(permission.user_id) if permission.user_id is not None else None
+        org_info = org_map.get(permission.org_id) if permission.org_id is not None else None
+        items.append(
+            PermissionOut.model_validate(permission).model_copy(
+                update={
+                    "user_username": user_info[0] if user_info else None,
+                    "user_email": user_info[1] if user_info else None,
+                    "org_name": org_info[0] if org_info else None,
+                    "org_slug": org_info[1] if org_info else None,
+                }
+            )
+        )
+    return items
+
+
+def _extract_text_preview(file_data: bytes, file_type: str) -> str:
+    """Extract text from a document for preview purposes."""
+    if file_type == "pdf":
+        import fitz  # PyMuPDF
+
+        doc = fitz.open(stream=file_data, filetype="pdf")
+        return "\n".join(page.get_text() for page in doc)
+    if file_type == "docx":
+        import docx
+
+        document = docx.Document(io.BytesIO(file_data))
+        return "\n".join(p.text for p in document.paragraphs)
+    if file_type == "xlsx":
+        import openpyxl
+
+        wb = openpyxl.load_workbook(io.BytesIO(file_data), read_only=True)
+        lines = []
+        for sheet in wb.worksheets:
+            for row in sheet.iter_rows(values_only=True):
+                lines.append("\t".join("" if c is None else str(c) for c in row))
+        return "\n".join(lines)
+    # txt or unknown — decode as UTF-8
+    return file_data.decode("utf-8", errors="replace")
+
+
+def _queue_process_task(document_id: int) -> None:
+    """Send the document processing task to the Celery broker."""
+    try:
+        from celery_client import celery_app
+
+        celery_app.send_task(
+            "worker.tasks.process_document.process_document",
+            args=[document_id],
+        )
+        logger.info("Queued processing task for document %d", document_id)
+    except Exception as exc:
+        # Non-fatal: document stays in 'pending' state and can be reindexed later
+        logger.warning("Failed to queue processing task for doc %d: %s", document_id, exc)

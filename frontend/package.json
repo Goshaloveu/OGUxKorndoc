@@ -1,0 +1,35 @@
+{
+  "name": "docsearch-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@bem-react/classname": "^1.8.0",
+    "@diplodoc/transform": "^4.74.0",
+    "@gravity-ui/aikit": "^1.17.0",
+    "@gravity-ui/components": "^4.18.0",
+    "@gravity-ui/date-components": "^3.4.0",
+    "@gravity-ui/i18n": "^1.8.0",
+    "@gravity-ui/icons": "^2.11.0",
+    "@gravity-ui/markdown-editor": "^15.40.0",
+    "@gravity-ui/navigation": "^4.0.14",
+    "@gravity-ui/uikit": "^7.4.0",
+    "@tanstack/react-query": "^5.56.2",
+    "axios": "^1.7.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "typescript": "^5.5.3",
+    "vite": "^5.4.2"
+  }
+}
