@@ -84,3 +84,8 @@ export interface SearchResponse {
   total: number;
   query_time_ms: number;
 }
+
+// AI Chat
+export type AnswerStyle = 'normal' | 'explanatory' | 'formal';
+
+export type KnownTool = 'search_documents' | 'search_faq';
