@@ -8,15 +8,18 @@ own loaded copy and never loads on-demand inside a task.
 """
 
 import logging
-import os
 import sys
+from pathlib import Path
 
 from celery import Celery
 from celery.signals import worker_process_init
 
-# Ensure shared/ is importable (mounted at /app/shared in Docker, or at
-# backend/shared when running locally from the repo root).
-sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
+# Ensure shared/ and tasks/ are importable in Docker and from repo-root smoke checks.
+_WORKER_DIR = Path(__file__).resolve().parent
+_BACKEND_DIR = _WORKER_DIR.parent
+for path in (_WORKER_DIR, _BACKEND_DIR):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
 
 from shared.config import settings  # noqa: E402
 
