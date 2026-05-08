@@ -195,8 +195,16 @@ class ChatSession(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
-      
-    
+
+    user: Mapped["User"] = relationship("User", back_populates="chat_sessions")
+    messages: Mapped[list["ChatMessage"]] = relationship(
+        "ChatMessage",
+        back_populates="session",
+        cascade="all, delete-orphan",
+        order_by="ChatMessage.created_at",
+    )
+
+
 class FAQItem(Base):
     __tablename__ = "faq_items"
 
@@ -215,15 +223,8 @@ class FAQItem(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
-    creator: Mapped["User"] = relationship("User", back_populates="faq_items")
 
-    user: Mapped["User"] = relationship("User", back_populates="chat_sessions")
-    messages: Mapped[list["ChatMessage"]] = relationship(
-        "ChatMessage",
-        back_populates="session",
-        cascade="all, delete-orphan",
-        order_by="ChatMessage.created_at",
-    )
+    creator: Mapped["User"] = relationship("User", back_populates="faq_items")
 
 
 class ChatMessage(Base):

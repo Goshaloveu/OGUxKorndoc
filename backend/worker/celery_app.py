@@ -49,17 +49,26 @@ celery_app.conf.update(
 # ---------------------------------------------------------------------------
 
 _embedder = None
+_sparse_embedder = None
 
 
 @worker_process_init.connect
 def _load_model_on_worker_init(**kwargs):
     """Pre-load the embedding model when each worker process starts."""
-    global _embedder
+    global _embedder, _sparse_embedder
     logger.info("Worker process init: loading embedding model %s", settings.embedding_model)
     from sentence_transformers import SentenceTransformer
 
     _embedder = SentenceTransformer(settings.embedding_model)
     logger.info("Embedding model loaded (dim=%d)", settings.embedding_dim)
+
+    logger.info(
+        "Worker process init: loading sparse embedding model %s", settings.sparse_embedding_model
+    )
+    from fastembed import SparseTextEmbedding
+
+    _sparse_embedder = SparseTextEmbedding(model_name=settings.sparse_embedding_model)
+    logger.info("Sparse embedding model loaded")
 
 
 def get_embedder():
@@ -68,3 +77,10 @@ def get_embedder():
         # Fallback: called outside prefork context (e.g. tests / solo pool)
         _load_model_on_worker_init()
     return _embedder
+
+
+def get_sparse_embedder():
+    """Return the sparse embedding model singleton."""
+    if _sparse_embedder is None:
+        _load_model_on_worker_init()
+    return _sparse_embedder

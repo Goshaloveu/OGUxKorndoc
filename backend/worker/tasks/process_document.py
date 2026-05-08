@@ -21,7 +21,7 @@ import uuid
 from collections.abc import Generator
 from datetime import UTC, datetime
 
-from celery_app import celery_app, get_embedder
+from celery_app import celery_app, get_embedder, get_sparse_embedder
 from shared.config import settings
 from shared.minio_client import download_file
 
@@ -42,20 +42,11 @@ def _get_qdrant_client():
 def _ensure_collection(client) -> None:
     """Create the Qdrant collection if it does not exist yet."""
     from qdrant_client.http.exceptions import UnexpectedResponse
-    from qdrant_client.http.models import Distance, VectorParams
 
     existing = [c.name for c in client.get_collections().collections]
     if settings.qdrant_collection not in existing:
         try:
-            client.create_collection(
-                collection_name=settings.qdrant_collection,
-                vectors_config=VectorParams(size=settings.embedding_dim, distance=Distance.COSINE),
-            )
-            logger.info(
-                "Created Qdrant collection '%s' (dim=%d)",
-                settings.qdrant_collection,
-                settings.embedding_dim,
-            )
+            _create_collection(client)
         except UnexpectedResponse as e:
             if e.status_code == 409:
                 logger.info(
@@ -64,6 +55,89 @@ def _ensure_collection(client) -> None:
                 )
             else:
                 raise
+        return
+
+    info = client.get_collection(settings.qdrant_collection)
+    params = info.config.params
+    vectors_config = params.vectors
+    sparse_vectors_config = params.sparse_vectors or {}
+    dense_config = vectors_config.get("dense") if isinstance(vectors_config, dict) else None
+    sparse_config = (
+        sparse_vectors_config.get("sparse") if isinstance(sparse_vectors_config, dict) else None
+    )
+    if dense_config is None or sparse_config is None:
+        _handle_collection_mismatch(
+            client,
+            "must use named vectors 'dense' and 'sparse' for hybrid search",
+        )
+        return
+    if dense_config.size != settings.embedding_dim:
+        _handle_collection_mismatch(
+            client,
+            f"dense vector size is {dense_config.size}, expected {settings.embedding_dim}",
+        )
+
+
+def _create_collection(client) -> None:
+    from qdrant_client.http.models import (
+        Distance,
+        SparseIndexParams,
+        SparseVectorParams,
+        VectorParams,
+    )
+
+    client.create_collection(
+        collection_name=settings.qdrant_collection,
+        vectors_config={
+            "dense": VectorParams(size=settings.embedding_dim, distance=Distance.COSINE)
+        },
+        sparse_vectors_config={
+            "sparse": SparseVectorParams(index=SparseIndexParams(on_disk=False))
+        },
+    )
+    logger.info(
+        "Created Qdrant collection '%s' (dense dim=%d, sparse=%s)",
+        settings.qdrant_collection,
+        settings.embedding_dim,
+        settings.sparse_embedding_model,
+    )
+
+
+def _handle_collection_mismatch(client, reason: str) -> None:
+    message = f"Qdrant collection '{settings.qdrant_collection}' {reason}."
+    if not settings.allow_qdrant_recreate_on_mismatch:
+        logger.error("%s Recreate it and run reindex_all_documents.", message)
+        raise RuntimeError(f"{message} Recreate it and run reindex_all_documents.")
+
+    logger.warning(
+        "%s Recreating it because ENVIRONMENT=%s. Run reindex_all_documents after startup.",
+        message,
+        settings.environment,
+    )
+    client.delete_collection(collection_name=settings.qdrant_collection)
+    _create_collection(client)
+
+
+def _recreate_collection(client) -> None:
+    """Explicitly recreate the collection before a full migration reindex."""
+    existing = [c.name for c in client.get_collections().collections]
+    if settings.qdrant_collection in existing:
+        client.delete_collection(collection_name=settings.qdrant_collection)
+
+    _create_collection(client)
+    logger.info("Recreated Qdrant collection '%s' for hybrid search", settings.qdrant_collection)
+
+
+def _delete_document_points(client, document_id: int) -> None:
+    """Remove existing chunks for a document before reindexing it."""
+    from qdrant_client.http.models import FieldCondition, Filter, MatchValue
+
+    client.delete(
+        collection_name=settings.qdrant_collection,
+        points_selector=Filter(
+            must=[FieldCondition(key="document_id", match=MatchValue(value=document_id))]
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -71,7 +145,7 @@ def _ensure_collection(client) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _extract_text_pdf(file_data: bytes) -> tuple[str, int]:
+def _extract_text_pdf(file_data: bytes) -> tuple[str, int, list[str]]:
     """Extract text from PDF.  Falls back to OCR if the page has no text layer."""
     import fitz  # PyMuPDF
 
@@ -92,10 +166,10 @@ def _extract_text_pdf(file_data: bytes) -> tuple[str, int]:
                 logger.warning("OCR failed for page %d: %s", page.number, ocr_err)
                 text = ""
         pages.append(text)
-    return "\n\n".join(pages), len(pages)
+    return "\n\n".join(pages), len(pages), pages
 
 
-def _extract_text_docx(file_data: bytes) -> tuple[str, int]:
+def _extract_text_docx(file_data: bytes) -> tuple[str, int, list[str]]:
     import docx
 
     document = docx.Document(io.BytesIO(file_data))
@@ -139,10 +213,10 @@ def _extract_text_docx(file_data: bytes) -> tuple[str, int]:
         except Exception as xml_err:
             logger.warning("XML fallback also failed: %s", xml_err)
 
-    return text, 0
+    return text, 0, [text]
 
 
-def _extract_text_xlsx(file_data: bytes) -> tuple[str, int]:
+def _extract_text_xlsx(file_data: bytes) -> tuple[str, int, list[str]]:
     import openpyxl
 
     wb = openpyxl.load_workbook(io.BytesIO(file_data), read_only=True)
@@ -150,10 +224,11 @@ def _extract_text_xlsx(file_data: bytes) -> tuple[str, int]:
     for sheet in wb.worksheets:
         for row in sheet.iter_rows(values_only=True):
             lines.append("\t".join("" if c is None else str(c) for c in row))
-    return "\n".join(lines), 0
+    text = "\n".join(lines)
+    return text, 0, [text]
 
 
-def _extract_text(file_data: bytes, file_type: str) -> tuple[str, int]:
+def _extract_text(file_data: bytes, file_type: str) -> tuple[str, int, list[str]]:
     """Return (full_text, page_count).  page_count is 0 for non-PDF formats."""
     if file_type == "pdf":
         return _extract_text_pdf(file_data)
@@ -162,7 +237,8 @@ def _extract_text(file_data: bytes, file_type: str) -> tuple[str, int]:
     if file_type == "xlsx":
         return _extract_text_xlsx(file_data)
     # txt / fallback
-    return file_data.decode("utf-8", errors="replace"), 0
+    text = file_data.decode("utf-8", errors="replace")
+    return text, 0, [text]
 
 
 # ---------------------------------------------------------------------------
@@ -172,18 +248,41 @@ def _extract_text(file_data: bytes, file_type: str) -> tuple[str, int]:
 
 def _chunk_text(
     text: str,
+    pages: list[str],
     chunk_size: int = 2048,
     overlap: int = 256,
-) -> Generator[str, None, None]:
-    """Yield sliding-window chunks of *text*."""
+) -> Generator[tuple[str, int], None, None]:
+    """Yield sliding-window chunks of *text* with their source page number."""
+    page_offsets: list[tuple[int, int]] = []
+    offset = 0
+    for page_index, page_text in enumerate(pages, start=1):
+        page_offsets.append((offset, page_index))
+        offset += len(page_text) + 2
+
     start = 0
     text_len = len(text)
     while start < text_len:
         end = min(start + chunk_size, text_len)
-        yield text[start:end]
+        page = 0
+        if len(pages) > 1:
+            for page_offset, page_index in page_offsets:
+                if page_offset <= start:
+                    page = page_index
+                else:
+                    break
+        yield text[start:end], page
         if end == text_len:
             break
         start += chunk_size - overlap
+
+
+def _to_qdrant_sparse_vector(sparse_embedding):
+    from qdrant_client.http.models import SparseVector
+
+    return SparseVector(
+        indices=sparse_embedding.indices.tolist(),
+        values=sparse_embedding.values.tolist(),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -302,36 +401,57 @@ def process_document(self, document_id: int) -> None:
 
         # 4. Extract text
         logger.info("Extracting text from %s (type=%s)", minio_path, file_type)
-        full_text, page_count = _extract_text(file_data, file_type)
+        full_text, page_count, pages = _extract_text(file_data, file_type)
 
         if not full_text.strip():
             logger.warning("Document %d produced empty text after extraction", document_id)
 
         # 5. Chunking
-        chunks = list(_chunk_text(full_text, settings.chunk_size, settings.chunk_overlap))
+        chunks = list(_chunk_text(full_text, pages, settings.chunk_size, settings.chunk_overlap))
         logger.info("Document %d split into %d chunks", document_id, len(chunks))
+
+        qdrant = _get_qdrant_client()
+        _ensure_collection(qdrant)
+        _delete_document_points(qdrant, document_id)
+
+        if not chunks:
+            _update_document_status(
+                document_id,
+                "indexed",
+                chunk_count=0,
+                page_count=page_count if page_count else None,
+                indexed_at=datetime.now(tz=UTC),
+            )
+            logger.info("Document %d indexed with no searchable chunks", document_id)
+            return
 
         # 6. Embed all chunks at once (batch for efficiency)
         embedder = get_embedder()
-        vectors = embedder.encode(chunks, show_progress_bar=False, batch_size=32)
+        chunk_texts = [chunk_text for chunk_text, _page in chunks]
+        vectors = embedder.encode(chunk_texts, show_progress_bar=False, batch_size=32)
+        sparse_embedder = get_sparse_embedder()
+        sparse_vectors = list(sparse_embedder.embed(chunk_texts))
 
         # 7. Upsert into Qdrant
-        qdrant = _get_qdrant_client()
-        _ensure_collection(qdrant)
-
         from qdrant_client.http.models import PointStruct
 
         points: list[PointStruct] = []
-        for idx, (chunk_text, vector) in enumerate(zip(chunks, vectors, strict=True)):
+        for idx, ((chunk_text, page), vector, sparse_vector) in enumerate(
+            zip(chunks, vectors, sparse_vectors, strict=True)
+        ):
             point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{document_id}-{idx}"))
             points.append(
                 PointStruct(
                     id=point_id,
-                    vector=vector.tolist(),
+                    vector={
+                        "dense": vector.tolist(),
+                        "sparse": _to_qdrant_sparse_vector(sparse_vector),
+                    },
                     payload={
                         "document_id": document_id,
                         "title": title,
                         "chunk_index": idx,
+                        "page": page,
                         "text": chunk_text,
                         "file_type": file_type,
                         "folder_path": folder_path,
@@ -368,3 +488,40 @@ def process_document(self, document_id: int) -> None:
             error_message=str(exc)[:1000],
         )
         raise self.retry(exc=exc, countdown=60) from None
+
+
+@celery_app.task(
+    name="worker.tasks.process_document.reindex_all_documents",
+)
+def reindex_all_documents() -> dict[str, int]:
+    """Queue all non-deleted documents for reindexing after collection/vector schema changes."""
+    import psycopg2
+
+    qdrant = _get_qdrant_client()
+    _recreate_collection(qdrant)
+
+    dsn = (
+        f"host={settings.postgres_host} port={settings.postgres_port} "
+        f"dbname={settings.postgres_db} user={settings.postgres_user} "
+        f"password={settings.postgres_password}"
+    )
+    conn = psycopg2.connect(dsn)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE documents "
+                "SET status = 'pending', error_message = NULL, chunk_count = NULL, "
+                "indexed_at = NULL, updated_at = now() "
+                "WHERE status != 'deleted' "
+                "RETURNING id"
+            )
+            document_ids = [row[0] for row in cur.fetchall()]
+        conn.commit()
+    finally:
+        conn.close()
+
+    for document_id in document_ids:
+        process_document.delay(document_id)
+
+    logger.info("Queued %d documents for hybrid search reindexing", len(document_ids))
+    return {"queued": len(document_ids)}
