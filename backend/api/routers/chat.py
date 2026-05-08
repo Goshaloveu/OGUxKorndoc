@@ -299,7 +299,16 @@ async def chat_completions(
     if not settings.llm_api_key:
         raise HTTPException(status_code=503, detail="LLM-провайдер не настроен")
 
-    body = await request.body()
+    raw_body = await request.body()
+    try:
+        body_data = json.loads(raw_body)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Невалидный JSON")
+
+    body_data.setdefault("model", settings.llm_model)
+    body_data.setdefault("max_tokens", settings.llm_max_tokens)
+    patched_body = json.dumps(body_data).encode()
+
     upstream_url = f"{settings.llm_base_url.rstrip('/')}/chat/completions"
     headers = {
         "Content-Type": "application/json",
@@ -307,19 +316,25 @@ async def chat_completions(
     }
 
     async def stream_upstream() -> AsyncGenerator[bytes, None]:
-        async with (
-            httpx.AsyncClient(timeout=_TIMEOUT) as client,
-            client.stream("POST", upstream_url, content=body, headers=headers) as resp,
-        ):
-            if resp.status_code >= 400:
-                error_bytes = await resp.aread()
-                logger.error("LLM upstream error %s: %s", resp.status_code, error_bytes[:200])
-                raise HTTPException(
-                    status_code=resp.status_code,
-                    detail=f"Ошибка LLM-провайдера: {resp.status_code}",
-                )
-            async for chunk in resp.aiter_bytes():
-                yield chunk
+        try:
+            async with (
+                httpx.AsyncClient(timeout=_TIMEOUT) as client,
+                client.stream("POST", upstream_url, content=patched_body, headers=headers) as resp,
+            ):
+                if resp.status_code >= 400:
+                    error_bytes = await resp.aread()
+                    logger.error("LLM upstream error %s: %s", resp.status_code, error_bytes[:200])
+                    error_payload = json.dumps(
+                        {"error": {"message": f"Ошибка LLM-провайдера: {resp.status_code}", "code": resp.status_code}}
+                    )
+                    yield f"data: {error_payload}\n\ndata: [DONE]\n\n".encode()
+                    return
+                async for chunk in resp.aiter_bytes():
+                    yield chunk
+        except Exception:
+            logger.exception("Unexpected error proxying LLM request")
+            error_payload = json.dumps({"error": {"message": "Внутренняя ошибка прокси", "code": 500}})
+            yield f"data: {error_payload}\n\ndata: [DONE]\n\n".encode()
 
     return StreamingResponse(
         stream_upstream(),
