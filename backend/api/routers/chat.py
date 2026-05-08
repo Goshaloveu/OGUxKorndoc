@@ -11,8 +11,11 @@ import json
 import logging
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
+from typing import cast
 
 import httpx
+from agent.graph import get_agent_graph
+from agent.prompts import AnswerStyle
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -86,7 +89,7 @@ class ChatMessagesOut(BaseModel):
 
 class SendMessageRequest(BaseModel):
     content: str = Field(min_length=1, max_length=20_000)
-    style: str | None = Field(default=None, max_length=100)
+    style: AnswerStyle = "normal"
 
     @field_validator("content")
     @classmethod
@@ -96,13 +99,16 @@ class SendMessageRequest(BaseModel):
             raise ValueError("Сообщение не может быть пустым")
         return stripped
 
-    @field_validator("style")
+    @field_validator("style", mode="before")
     @classmethod
-    def validate_style(cls, value: str | None) -> str | None:
-        if value is None:
-            return value
-        stripped = value.strip()
-        return stripped or None
+    def validate_style(cls, value: str | None) -> AnswerStyle:
+        if value is None or not str(value).strip():
+            return "normal"
+        stripped = str(value).strip()
+        allowed = {"normal", "explanatory", "formal"}
+        if stripped not in allowed:
+            raise ValueError("Стиль ответа должен быть normal, explanatory или formal")
+        return cast(AnswerStyle, stripped)
 
 
 async def _get_owned_session(
@@ -249,25 +255,42 @@ async def send_message(
 
     async def event_stream() -> AsyncGenerator[str, None]:
         assistant_content: list[str] = []
+        tool_events: list[dict] = []
         try:
             history_result = await db.execute(_message_history_query(session.id, _HISTORY_LIMIT))
             history = list(reversed(history_result.scalars().all()))
-            llm_messages = [
+            agent_history = [
                 {"role": message.role, "content": message.content}
                 for message in history
                 if message.role in {"user", "assistant", "system"}
             ]
-            if body.style:
-                llm_messages.insert(0, {"role": "system", "content": f"Стиль ответа: {body.style}"})
 
-            async for token in request.app.state.llm.stream(llm_messages):
-                assistant_content.append(token)
-                yield _format_sse("token", {"content": token})
+            auth_header = request.headers.get("Authorization") or request.headers.get(
+                "authorization"
+            )
+            if not auth_header:
+                raise RuntimeError("Authorization header is required for agent tools")
+
+            async for agent_event in get_agent_graph().astream(
+                request=request,
+                session_id=session.id,
+                original_query=body.content,
+                style=body.style,
+                auth_header=auth_header,
+                history=agent_history,
+            ):
+                if agent_event["event"] == "token":
+                    token = str(agent_event["data"].get("content", ""))
+                    assistant_content.append(token)
+                else:
+                    tool_events.append({"event": agent_event["event"], **agent_event["data"]})
+                yield _format_sse(agent_event["event"], agent_event["data"])
 
             assistant_message = ChatMessage(
                 session_id=session.id,
                 role="assistant",
                 content="".join(assistant_content),
+                tool_calls={"events": tool_events} if tool_events else None,
             )
             db.add(assistant_message)
             session.updated_at = datetime.now(UTC)

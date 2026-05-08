@@ -1,5 +1,15 @@
 import logging
+import sys
 from contextlib import asynccontextmanager
+from pathlib import Path
+
+# Imports below rely on sys.path adjusted here for repo-root smoke checks and Docker entrypoints.
+# ruff: noqa: E402
+_API_DIR = Path(__file__).resolve().parent
+_BACKEND_DIR = _API_DIR.parent
+for path in (_API_DIR, _BACKEND_DIR):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
