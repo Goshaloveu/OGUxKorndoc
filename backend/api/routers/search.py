@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from shared.config import settings
 from shared.database import get_db
+from shared.llm import rephrase_query
 from shared.models import AuditLog, Document, DocumentPermission, FAQItem, OrganizationMember, User
 from shared.security import get_current_user
 from sqlalchemy import or_, select
@@ -43,6 +44,7 @@ class SearchRequest(BaseModel):
     query: str
     limit: int = 10
     filters: SearchFilters = SearchFilters()
+    history: list[dict] = []
 
 
 class SearchResult(BaseModel):
@@ -226,13 +228,16 @@ async def search(
     db.add(audit)
     await db.commit()
 
-    # 2. Embed query
-    embedder = request.app.state.embedder
-    vector: list[float] = embedder.encode([query.query])[0].tolist()
-    sparse_embedder = request.app.state.sparse_embedder
-    sparse_vector = _to_qdrant_sparse_vector(next(sparse_embedder.embed([query.query])))
+    # 2. Rephrase query via LLM (fallback to original if LLM unavailable)
+    search_query = await rephrase_query(query.query, query.history, request.app.state.llm)
 
-    # 3. Build Qdrant filter
+    # 3. Embed query
+    embedder = request.app.state.embedder
+    vector: list[float] = embedder.encode([search_query])[0].tolist()
+    sparse_embedder = request.app.state.sparse_embedder
+    sparse_vector = _to_qdrant_sparse_vector(next(sparse_embedder.embed([search_query])))
+
+    # 4. Build Qdrant filter
     user_org_ids: list[int] = []
     permitted_doc_ids: list[int] = []
     if current_user.role != "admin":
@@ -242,7 +247,7 @@ async def search(
         current_user, user_org_ids, permitted_doc_ids, query.filters
     )
 
-    # 4. Qdrant hybrid search (dense + sparse prefetch, RRF fusion; over-fetch for dedup)
+    # 5. Qdrant hybrid search (dense + sparse prefetch, RRF fusion; over-fetch for dedup)
     from qdrant_client import QdrantClient
     from qdrant_client.http.models import Fusion, FusionQuery, Prefetch
 
@@ -266,7 +271,7 @@ async def search(
         logger.warning("Qdrant search failed (collection may be empty): %s", exc)
         hits = []
 
-    # 5. Deduplicate by document_id — keep the chunk with the best score
+    # 6. Deduplicate by document_id — keep the chunk with the best score
     best_by_doc: dict[int, tuple[float, dict]] = {}
     for hit in hits:
         if hit.payload is None:
@@ -277,7 +282,7 @@ async def search(
         if doc_id not in best_by_doc or hit.score > best_by_doc[doc_id][0]:
             best_by_doc[doc_id] = (hit.score, hit.payload)
 
-    # 6. Enrich from PostgreSQL and apply remaining filters
+    # 7. Enrich from PostgreSQL and apply remaining filters
     results: list[SearchResult] = []
 
     if best_by_doc:
@@ -316,7 +321,7 @@ async def search(
         candidates.sort(key=lambda x: x[0], reverse=True)
         candidates = candidates[: query.limit]
 
-        # 7. Build result list
+        # 8. Build result list
         for score, doc_id in candidates:
             pg_doc = pg_docs[doc_id]
             _score, payload = best_by_doc[doc_id]
