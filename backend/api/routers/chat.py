@@ -11,8 +11,10 @@ import json
 import logging
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
+from typing import Literal
 
 import httpx
+from agent import get_agent_graph
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -86,7 +88,7 @@ class ChatMessagesOut(BaseModel):
 
 class SendMessageRequest(BaseModel):
     content: str = Field(min_length=1, max_length=20_000)
-    style: str | None = Field(default=None, max_length=100)
+    style: Literal["normal", "explanatory", "formal"] | None = "normal"
 
     @field_validator("content")
     @classmethod
@@ -98,11 +100,10 @@ class SendMessageRequest(BaseModel):
 
     @field_validator("style")
     @classmethod
-    def validate_style(cls, value: str | None) -> str | None:
-        if value is None:
-            return value
-        stripped = value.strip()
-        return stripped or None
+    def validate_style(
+        cls, value: Literal["normal", "explanatory", "formal"] | None
+    ) -> Literal["normal", "explanatory", "formal"]:
+        return value or "normal"
 
 
 async def _get_owned_session(
@@ -239,6 +240,9 @@ async def send_message(
     db: AsyncSession = Depends(get_db),
 ):
     session = await _get_owned_session(session_id, current_user, db)
+    auth_header = request.headers.get("authorization")
+    if not auth_header:
+        raise HTTPException(status_code=401, detail="Не передан токен авторизации")
 
     user_message = ChatMessage(session_id=session.id, role="user", content=body.content)
     db.add(user_message)
@@ -252,17 +256,26 @@ async def send_message(
         try:
             history_result = await db.execute(_message_history_query(session.id, _HISTORY_LIMIT))
             history = list(reversed(history_result.scalars().all()))
-            llm_messages = [
+            llm_messages: list[dict[str, str]] = [
                 {"role": message.role, "content": message.content}
                 for message in history
                 if message.role in {"user", "assistant", "system"}
             ]
-            if body.style:
-                llm_messages.insert(0, {"role": "system", "content": f"Стиль ответа: {body.style}"})
 
-            async for token in request.app.state.llm.stream(llm_messages):
-                assistant_content.append(token)
-                yield _format_sse("token", {"content": token})
+            agent_graph = get_agent_graph()
+            async for agent_event in agent_graph.astream(
+                request=request,
+                session_id=session.id,
+                original_query=body.content,
+                style=body.style or "normal",
+                auth_header=auth_header,
+                history=llm_messages,
+            ):
+                if agent_event["event"] == "token":
+                    content = agent_event["data"].get("content", "")
+                    if isinstance(content, str):
+                        assistant_content.append(content)
+                yield _format_sse(agent_event["event"], agent_event["data"])
 
             assistant_message = ChatMessage(
                 session_id=session.id,
@@ -302,8 +315,8 @@ async def chat_completions(
     raw_body = await request.body()
     try:
         body_data = json.loads(raw_body)
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Невалидный JSON")
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Невалидный JSON") from exc
 
     body_data.setdefault("model", settings.llm_model)
     body_data.setdefault("max_tokens", settings.llm_max_tokens)
@@ -325,7 +338,12 @@ async def chat_completions(
                     error_bytes = await resp.aread()
                     logger.error("LLM upstream error %s: %s", resp.status_code, error_bytes[:200])
                     error_payload = json.dumps(
-                        {"error": {"message": f"Ошибка LLM-провайдера: {resp.status_code}", "code": resp.status_code}}
+                        {
+                            "error": {
+                                "message": f"Ошибка LLM-провайдера: {resp.status_code}",
+                                "code": resp.status_code,
+                            }
+                        }
                     )
                     yield f"data: {error_payload}\n\ndata: [DONE]\n\n".encode()
                     return
@@ -333,7 +351,9 @@ async def chat_completions(
                     yield chunk
         except Exception:
             logger.exception("Unexpected error proxying LLM request")
-            error_payload = json.dumps({"error": {"message": "Внутренняя ошибка прокси", "code": 500}})
+            error_payload = json.dumps(
+                {"error": {"message": "Внутренняя ошибка прокси", "code": 500}}
+            )
             yield f"data: {error_payload}\n\ndata: [DONE]\n\n".encode()
 
     return StreamingResponse(

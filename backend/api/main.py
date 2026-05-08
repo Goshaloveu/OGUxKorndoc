@@ -1,4 +1,6 @@
 import logging
+import os
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -7,10 +9,25 @@ from fastembed import SparseTextEmbedding
 from qdrant_client import QdrantClient
 from qdrant_client.http.exceptions import UnexpectedResponse
 from qdrant_client.http.models import Distance, SparseIndexParams, SparseVectorParams, VectorParams
-from routers import admin, auth, chat, documents, faq, organizations, profile, search, users
 from sentence_transformers import SentenceTransformer
-from shared.config import settings
-from shared.llm import ChatLLM
+
+current_dir = os.path.dirname(__file__)
+sys.path.insert(0, current_dir)
+sys.path.insert(0, os.path.dirname(current_dir))
+
+from routers import (  # noqa: E402
+    admin,
+    auth,
+    chat,
+    documents,
+    faq,
+    organizations,
+    profile,
+    search,
+    users,
+)
+from shared.config import settings  # noqa: E402
+from shared.llm import ChatLLM  # noqa: E402
 
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper(), logging.INFO),

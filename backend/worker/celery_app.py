@@ -16,7 +16,9 @@ from celery.signals import worker_process_init
 
 # Ensure shared/ is importable (mounted at /app/shared in Docker, or at
 # backend/shared when running locally from the repo root).
-sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
+current_dir = os.path.dirname(__file__)
+sys.path.insert(0, current_dir)
+sys.path.insert(0, os.path.dirname(current_dir))
 
 from shared.config import settings  # noqa: E402
 

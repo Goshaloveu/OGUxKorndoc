@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from shared.config import settings
 from shared.database import get_db
-from shared.models import AuditLog, Document, DocumentPermission, OrganizationMember, User
+from shared.models import AuditLog, Document, DocumentPermission, FAQItem, OrganizationMember, User
 from shared.security import get_current_user
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -58,6 +58,21 @@ class SearchResult(BaseModel):
 
 class SearchResponse(BaseModel):
     results: list[SearchResult]
+    total: int
+    query_time_ms: int
+
+
+class FAQSearchResult(BaseModel):
+    faq_id: int
+    question: str
+    answer: str
+    snippet_html: str
+    score: float
+    updated_at: datetime
+
+
+class FAQSearchResponse(BaseModel):
+    results: list[FAQSearchResult]
     total: int
     query_time_ms: int
 
@@ -377,3 +392,51 @@ async def suggest(
     stmt = stmt.limit(10)
     result = await db.execute(stmt)
     return [row[0] for row in result.all()]
+
+
+@router.get("/faq", response_model=FAQSearchResponse)
+async def search_faq(
+    q: str = "",
+    limit: int = 5,
+    _current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Search published FAQ items for agent retrieval context."""
+    start_time = time.monotonic()
+    query_text = q.strip()
+    limit = max(1, min(limit, 20))
+    if not query_text:
+        return FAQSearchResponse(results=[], total=0, query_time_ms=0)
+
+    stmt = select(FAQItem).where(FAQItem.is_published == True)  # noqa: E712
+    tokens = [token for token in query_text.split() if len(token) > 2]
+    if tokens:
+        stmt = stmt.where(
+            or_(
+                *[
+                    or_(FAQItem.question.ilike(f"%{token}%"), FAQItem.answer.ilike(f"%{token}%"))
+                    for token in tokens
+                ]
+            )
+        )
+    stmt = stmt.order_by(FAQItem.order.asc(), FAQItem.updated_at.desc()).limit(limit)
+    result = await db.execute(stmt)
+
+    items = result.scalars().all()
+    faq_results = [
+        FAQSearchResult(
+            faq_id=item.id,
+            question=item.question,
+            answer=item.answer,
+            snippet_html=build_snippet(f"{item.question}\n\n{item.answer}", query_text),
+            score=max(0.1, 1.0 - index * 0.05),
+            updated_at=item.updated_at,
+        )
+        for index, item in enumerate(items)
+    ]
+    query_time_ms = int((time.monotonic() - start_time) * 1000)
+    return FAQSearchResponse(
+        results=faq_results,
+        total=len(faq_results),
+        query_time_ms=query_time_ms,
+    )
