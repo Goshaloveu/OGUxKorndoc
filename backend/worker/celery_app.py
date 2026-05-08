@@ -30,7 +30,7 @@ celery_app = Celery(
     "docsearch_worker",
     broker=settings.redis_url,
     backend=settings.redis_url,
-    include=["tasks.process_document"],
+    include=["tasks.process_document", "tasks.index_faq"],
 )
 
 celery_app.conf.update(

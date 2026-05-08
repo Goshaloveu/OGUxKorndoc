@@ -302,8 +302,8 @@ async def chat_completions(
     raw_body = await request.body()
     try:
         body_data = json.loads(raw_body)
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Невалидный JSON")
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Невалидный JSON") from exc
 
     body_data.setdefault("model", settings.llm_model)
     body_data.setdefault("max_tokens", settings.llm_max_tokens)
@@ -325,7 +325,12 @@ async def chat_completions(
                     error_bytes = await resp.aread()
                     logger.error("LLM upstream error %s: %s", resp.status_code, error_bytes[:200])
                     error_payload = json.dumps(
-                        {"error": {"message": f"Ошибка LLM-провайдера: {resp.status_code}", "code": resp.status_code}}
+                        {
+                            "error": {
+                                "message": f"Ошибка LLM-провайдера: {resp.status_code}",
+                                "code": resp.status_code,
+                            }
+                        }
                     )
                     yield f"data: {error_payload}\n\ndata: [DONE]\n\n".encode()
                     return
@@ -333,7 +338,9 @@ async def chat_completions(
                     yield chunk
         except Exception:
             logger.exception("Unexpected error proxying LLM request")
-            error_payload = json.dumps({"error": {"message": "Внутренняя ошибка прокси", "code": 500}})
+            error_payload = json.dumps(
+                {"error": {"message": "Внутренняя ошибка прокси", "code": 500}}
+            )
             yield f"data: {error_payload}\n\ndata: [DONE]\n\n".encode()
 
     return StreamingResponse(

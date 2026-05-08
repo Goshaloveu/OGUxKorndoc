@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     qdrant_host: str = "qdrant"
     qdrant_port: int = 6333
     qdrant_collection: str = "documents"
+    qdrant_faq_collection: str = "faq"
     qdrant_recreate_on_mismatch: bool = False
 
     # JWT

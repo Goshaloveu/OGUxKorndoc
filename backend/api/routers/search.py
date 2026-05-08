@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from shared.config import settings
 from shared.database import get_db
-from shared.models import AuditLog, Document, DocumentPermission, OrganizationMember, User
+from shared.models import AuditLog, Document, DocumentPermission, FAQItem, OrganizationMember, User
 from shared.security import get_current_user
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -58,6 +58,21 @@ class SearchResult(BaseModel):
 
 class SearchResponse(BaseModel):
     results: list[SearchResult]
+    total: int
+    query_time_ms: int
+
+
+class FAQSearchResult(BaseModel):
+    faq_id: int
+    question: str
+    answer: str
+    snippet_html: str
+    score: float
+    updated_at: datetime
+
+
+class FAQSearchResponse(BaseModel):
+    results: list[FAQSearchResult]
     total: int
     query_time_ms: int
 
@@ -377,3 +392,106 @@ async def suggest(
     stmt = stmt.limit(10)
     result = await db.execute(stmt)
     return [row[0] for row in result.all()]
+
+
+@router.get("/faq", response_model=FAQSearchResponse)
+async def search_faq(
+    request: Request,
+    q: str = "",
+    limit: int = 10,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Semantic search over published FAQ entries."""
+    start_time = time.monotonic()
+    query = q.strip()
+    if not query:
+        return FAQSearchResponse(results=[], total=0, query_time_ms=0)
+
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="search_faq",
+        resource_type="faq",
+        details={"query": query},
+    )
+    db.add(audit)
+    await db.commit()
+
+    embedder = request.app.state.embedder
+    vector: list[float] = embedder.encode([query])[0].tolist()
+    sparse_embedder = request.app.state.sparse_embedder
+    sparse_vector = _to_qdrant_sparse_vector(next(sparse_embedder.embed([query])))
+
+    from qdrant_client import QdrantClient
+    from qdrant_client.http.models import (
+        FieldCondition,
+        Filter,
+        Fusion,
+        FusionQuery,
+        MatchValue,
+        Prefetch,
+    )
+
+    qdrant = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
+    qdrant_filter = Filter(must=[FieldCondition(key="is_active", match=MatchValue(value=True))])
+
+    try:
+        response = qdrant.query_points(
+            collection_name=settings.qdrant_faq_collection,
+            prefetch=[
+                Prefetch(query=vector, using="dense", limit=limit * 2),
+                Prefetch(query=sparse_vector, using="sparse", limit=limit * 2),
+            ],
+            query=FusionQuery(fusion=Fusion.RRF),
+            query_filter=qdrant_filter,
+            limit=limit * 2,
+            with_payload=True,
+        )
+        hits = response.points
+    except Exception as exc:
+        logger.warning("Qdrant FAQ search failed (collection may be empty): %s", exc)
+        hits = []
+
+    best_by_faq: dict[int, tuple[float, dict]] = {}
+    for hit in hits:
+        if hit.payload is None:
+            continue
+        faq_id: int | None = hit.payload.get("faq_id")
+        if faq_id is None:
+            continue
+        if faq_id not in best_by_faq or hit.score > best_by_faq[faq_id][0]:
+            best_by_faq[faq_id] = (hit.score, hit.payload)
+
+    results: list[FAQSearchResult] = []
+    if best_by_faq:
+        faq_ids = list(best_by_faq.keys())
+        pg_result = await db.execute(
+            select(FAQItem).where(
+                FAQItem.id.in_(faq_ids),
+                FAQItem.is_published == True,  # noqa: E712
+            )
+        )
+        pg_items = {item.id: item for item in pg_result.scalars().all()}
+        candidates = [
+            (score, faq_id)
+            for faq_id, (score, _payload) in best_by_faq.items()
+            if faq_id in pg_items
+        ]
+        candidates.sort(key=lambda x: x[0], reverse=True)
+
+        for score, faq_id in candidates[:limit]:
+            item = pg_items[faq_id]
+            text = f"{item.question}\n\n{item.answer}"
+            results.append(
+                FAQSearchResult(
+                    faq_id=item.id,
+                    question=item.question,
+                    answer=item.answer,
+                    snippet_html=build_snippet(text, query),
+                    score=score,
+                    updated_at=item.updated_at,
+                )
+            )
+
+    query_time_ms = int((time.monotonic() - start_time) * 1000)
+    return FAQSearchResponse(results=results, total=len(results), query_time_ms=query_time_ms)
