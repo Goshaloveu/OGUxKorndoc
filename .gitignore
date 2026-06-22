@@ -230,3 +230,4 @@ status_checks/
 watch_agent.py
 TASKS.md
 itervox.out
+STATUS_REPORT_PROMPT.md
