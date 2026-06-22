@@ -85,7 +85,7 @@ def _strip_marks(value: str) -> str:
     return value.replace("<mark>", "").replace("</mark>", "")
 
 
-def result_preview(result: str, limit: int = 220) -> str:
+def result_preview(result: str, limit: int = 4000) -> str:
     compact = " ".join(result.split())
     if len(compact) <= limit:
         return compact

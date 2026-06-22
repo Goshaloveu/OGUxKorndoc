@@ -1,6 +1,8 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { SegmentedRadioGroup, Switch, Text } from '@gravity-ui/uikit';
 import { ChatContainer } from '@gravity-ui/aikit';
+import { ThinkingMessage } from '@gravity-ui/aikit/ThinkingMessage';
+import { createMessageRendererRegistry, registerMessageRenderer } from '@gravity-ui/aikit/utils/messageTypeRegistry';
 import '@gravity-ui/aikit/styles';
 import type {
   ChatStatus,
@@ -10,6 +12,7 @@ import type {
   TDefaultMessageContent,
   TSubmitData,
   ThinkingMessageContentData,
+  ThinkingMessageContent,
 } from '@gravity-ui/aikit';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toaster } from '@gravity-ui/uikit/toaster-singleton';
@@ -50,7 +53,7 @@ function buildThinkingBlock(
 ): TDefaultMessageContent {
   return {
     type: 'thinking',
-    data: { title, content, status },
+    data: { title, content, status, enabledCopy: true, defaultExpanded: true },
   };
 }
 
@@ -145,6 +148,16 @@ const AIAssistantPage: React.FC = () => {
 
   const abortRef = useRef<AbortController | null>(null);
   const streamBlocksRef = useRef<TDefaultMessageContent[]>([]);
+
+  const messageRendererRegistry = useMemo(() => {
+    const registry = createMessageRendererRegistry();
+    registerMessageRenderer<ThinkingMessageContent>(registry, 'thinking', {
+      component: ({ part }) => (
+        <ThinkingMessage {...part.data} format="markdown" enabledCopy defaultExpanded />
+      ),
+    });
+    return registry;
+  }, []);
 
   const { data: sessions = [] } = useQuery({
     queryKey: ['chatSessions'],
@@ -504,6 +517,7 @@ const AIAssistantPage: React.FC = () => {
         onRetry={handleRetry}
         showHistory
         showNewChat
+        messageListConfig={{ messageRendererRegistry }}
         promptInputProps={{
           topPanel: {
             isOpen: true,
